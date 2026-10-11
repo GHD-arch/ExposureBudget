@@ -1,0 +1,102 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Cible de compilation :
+           Stable  (defaut) : N.I.N.A. 3.2 installee, net8.0-windows
+           Nightly          : sources de E:\DEV\nina (nightly 3.3), net10.0-windows
+         Un plugin net10 ne peut pas etre charge par la N.I.N.A. 3.2 stable. -->
+    <NinaTarget Condition="'$(NinaTarget)' == ''">Stable</NinaTarget>
+    <TargetFramework Condition="'$(NinaTarget)' == 'Stable'">net8.0-windows</TargetFramework>
+    <TargetFramework Condition="'$(NinaTarget)' == 'Nightly'">net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <OutputType>Library</OutputType>
+    <AssemblyName>NINA.Plugin.ExposureBudget</AssemblyName>
+    <RootNamespace>NINA.Plugin.ExposureBudget</RootNamespace>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <Configurations>Debug;Release</Configurations>
+    <LangVersion>latest</LangVersion>
+    <Deterministic>true</Deterministic>
+    <DebugType>portable</DebugType>
+    <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!-- Dossier des assemblies N.I.N.A. contre lesquelles le plugin est compile.
+         Les assemblies NINA ne sont jamais copiees dans la sortie : le plugin les
+         resout depuis l'application hote au chargement. -->
+    <NinaSdkPath Condition="'$(NinaSdkPath)' == '' And '$(NinaTarget)' == 'Stable'">C:\Program Files\N.I.N.A. - Nighttime Imaging 'N' Astronomy</NinaSdkPath>
+    <!-- Sortie de l'application construite depuis les sources : elle contient l'ensemble
+         des assemblies (NINA.*, MEF, CommunityToolkit.Mvvm, System.Text.Json...). -->
+    <NinaSdkPath Condition="'$(NinaSdkPath)' == '' And '$(NinaTarget)' == 'Nightly'">E:\DEV\nina\NINA\bin\Debug\net10.0-windows</NinaSdkPath>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!-- Les assemblies N.I.N.A. referencees ici dependent transitivement de versions plus
+         recentes de System.Text.Json que le framework net8. Ce conflit de versions est
+         sans effet : elles sont fournies par l'application hote au chargement, et le
+         plugin n'utilise lui-meme aucune API de serialisation. -->
+    <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);MSB3277</MSBuildWarningsAsMessages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- MEF (System.ComponentModel.Composition) : fourni par N.I.N.A., il sert aux
+         attributs [Export] / [Import]. Meme version que l'application hote. -->
+    <Reference Include="System.ComponentModel.Composition">
+      <HintPath>$(NinaSdkPath)\System.ComponentModel.Composition.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="NINA.Plugin">
+      <HintPath>$(NinaSdkPath)\NINA.Plugin.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="NINA.Core">
+      <HintPath>$(NinaSdkPath)\NINA.Core.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="NINA.Astrometry">
+      <HintPath>$(NinaSdkPath)\NINA.Astrometry.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="NINA.Profile">
+      <HintPath>$(NinaSdkPath)\NINA.Profile.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="NINA.Equipment">
+      <HintPath>$(NinaSdkPath)\NINA.Equipment.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="NINA.CustomControlLibrary">
+      <HintPath>$(NinaSdkPath)\NINA.CustomControlLibrary.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="NINA.WPF.Base">
+      <HintPath>$(NinaSdkPath)\NINA.WPF.Base.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="CommunityToolkit.Mvvm">
+      <HintPath>$(NinaSdkPath)\CommunityToolkit.Mvvm.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Image du plugin, integree a l'assembly et referencee par un pack URI dans
+         Descriptions.FeaturedImageURL (elle apparait dans Options > Plugins, dans la
+         liste et a cote de l'auteur et de la version). Preparee par tools\makeicon
+         (mode resize) a partir de l'image fournie : 256 x 256, carree. -->
+    <Resource Include="Resources\PluginImage.png" />
+  </ItemGroup>
+
+  <Target Name="ExposureBudgetCheckNinaSdkPath" BeforeTargets="ResolveAssemblyReferences">
+    <!-- Message clair plutot qu'une serie d'erreurs CS0246 si le dossier de reference
+         ne contient pas l'ensemble des assemblies de N.I.N.A. -->
+    <Error Condition="!Exists('$(NinaSdkPath)\NINA.Plugin.dll')" Text="Assemblies N.I.N.A. introuvables dans '$(NinaSdkPath)'. Indiquez le dossier d'installation de N.I.N.A. avec -p:NinaSdkPath=... (cible Stable) ou construisez d'abord l'application depuis les sources (cible Nightly)." />
+    <Error Condition="!Exists('$(NinaSdkPath)\System.ComponentModel.Composition.dll') Or !Exists('$(NinaSdkPath)\CommunityToolkit.Mvvm.dll')" Text="Le dossier '$(NinaSdkPath)' ne contient pas l'ensemble des assemblies requises (System.ComponentModel.Composition.dll, CommunityToolkit.Mvvm.dll). Utilisez le dossier d'installation de N.I.N.A. ou la sortie complete de l'application compilee (E:\DEV\nina\NINA\bin\...)." />
+  </Target>
+
+  <Target Name="ExposureBudgetSummary" AfterTargets="Build">
+    <Message Importance="high" Text="Plugin construit : $(TargetPath)" />
+    <Message Importance="high" Text="Installez-le ensuite avec tools\install.ps1 (ou copiez le dll dans %LOCALAPPDATA%\NINA\Plugins\3.0.0\ExposureBudget\)" />
+  </Target>
+
+</Project>

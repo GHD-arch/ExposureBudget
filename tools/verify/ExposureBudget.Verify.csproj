@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>ExposureBudget.Verify</AssemblyName>
+    <RootNamespace>NINA.Plugin.ExposureBudget.Verify</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <!-- Harnais de verification : il compile directement les sources de la logique de calcul
+       du plugin (aucune dependance WPF ni NuGet), ce qui permet de valider les regles
+       d'arrondi et le passage de minuit hors de N.I.N.A. -->
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="..\..\NINA.Plugin.ExposureBudget\Model\ExposureBudgetCalculator.cs" Link="Model\ExposureBudgetCalculator.cs" />
+    <Compile Include="..\..\NINA.Plugin.ExposureBudget\Model\ExposureCountResult.cs" Link="Model\ExposureCountResult.cs" />
+  </ItemGroup>
+
+</Project>

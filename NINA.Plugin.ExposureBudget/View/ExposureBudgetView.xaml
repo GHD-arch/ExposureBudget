@@ -1,0 +1,300 @@
+<UserControl
+    x:Class="NINA.Plugin.ExposureBudget.View.ExposureBudgetView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:ninactrl="clr-namespace:NINA.CustomControlLibrary;assembly=NINA.CustomControlLibrary"
+    xmlns:vm="clr-namespace:NINA.Plugin.ExposureBudget.ViewModel"
+    MinWidth="300"
+    MinHeight="320"
+    d:DataContext="{d:DesignInstance Type=vm:ExposureBudgetVM,
+                                     IsDesignTimeCreatable=False}"
+    d:DesignHeight="560"
+    d:DesignWidth="360"
+    mc:Ignorable="d">
+
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+    </UserControl.Resources>
+
+    <!--
+        Les libellés et les infobulles sont liés à Labels (IPluginStrings) : la langue du
+        panneau (anglais par défaut, français via "language=fr" dans les réglages) est
+        choisie dans le ViewModel. Les styles implicites de N.I.N.A. (TextBlock, Button,
+        TextBox, GroupBox, ascenseurs) sont hérités automatiquement.
+    -->
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="10,6,10,12">
+
+            <GroupBox Header="{Binding Labels.WindowGroupHeader}" Padding="0,4,0,6">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" MinWidth="62" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" MinWidth="62" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock
+                        Grid.Row="0"
+                        Grid.Column="0"
+                        Margin="0,0,6,0"
+                        VerticalAlignment="Center"
+                        Text="{Binding Labels.StartLabel}" />
+                    <ninactrl:IntStepperControl
+                        Grid.Row="0"
+                        Grid.Column="1"
+                        Margin="0,2"
+                        MaxValue="23"
+                        MinValue="0"
+                        StepSize="1"
+                        ToolTip="{Binding Labels.StartHourTooltip}"
+                        Unit="h"
+                        Value="{Binding StartHour, Mode=TwoWay}" />
+                    <TextBlock
+                        Grid.Row="0"
+                        Grid.Column="2"
+                        Margin="4,0"
+                        VerticalAlignment="Center"
+                        FontSize="16"
+                        FontWeight="Bold"
+                        Text=":" />
+                    <ninactrl:IntStepperControl
+                        Grid.Row="0"
+                        Grid.Column="3"
+                        Margin="0,2"
+                        MaxValue="59"
+                        MinValue="0"
+                        StepSize="1"
+                        ToolTip="{Binding Labels.StartMinuteTooltip}"
+                        Unit="min"
+                        Value="{Binding StartMinute, Mode=TwoWay}" />
+
+                    <TextBlock
+                        Grid.Row="1"
+                        Grid.Column="0"
+                        Margin="0,0,6,0"
+                        VerticalAlignment="Center"
+                        Text="{Binding Labels.EndLabel}" />
+                    <ninactrl:IntStepperControl
+                        Grid.Row="1"
+                        Grid.Column="1"
+                        Margin="0,2"
+                        MaxValue="23"
+                        MinValue="0"
+                        StepSize="1"
+                        ToolTip="{Binding Labels.EndHourTooltip}"
+                        Unit="h"
+                        Value="{Binding EndHour, Mode=TwoWay}" />
+                    <TextBlock
+                        Grid.Row="1"
+                        Grid.Column="2"
+                        Margin="4,0"
+                        VerticalAlignment="Center"
+                        FontSize="16"
+                        FontWeight="Bold"
+                        Text=":" />
+                    <ninactrl:IntStepperControl
+                        Grid.Row="1"
+                        Grid.Column="3"
+                        Margin="0,2"
+                        MaxValue="59"
+                        MinValue="0"
+                        StepSize="1"
+                        ToolTip="{Binding Labels.EndMinuteTooltip}"
+                        Unit="min"
+                        Value="{Binding EndMinute, Mode=TwoWay}" />
+
+                    <!--  Bouton « Maintenant » : remplit l'heure de début avec l'heure courante.  -->
+                    <Button
+                        Grid.Row="0"
+                        Grid.RowSpan="2"
+                        Grid.Column="4"
+                        MinWidth="52"
+                        Margin="6,2,0,2"
+                        Padding="6,0"
+                        Command="{Binding SetStartToNowCommand}"
+                        Content="{Binding Labels.NowButtonText}"
+                        ToolTip="{Binding Labels.NowButtonTooltip}" />
+
+                    <TextBlock
+                        Grid.Row="2"
+                        Grid.Column="0"
+                        Grid.ColumnSpan="2"
+                        Margin="0,10,0,0"
+                        Text="{Binding Labels.WindowDurationLabel}" />
+                    <TextBlock
+                        Grid.Row="2"
+                        Grid.Column="2"
+                        Grid.ColumnSpan="3"
+                        Margin="0,10,0,0"
+                        HorizontalAlignment="Right"
+                        FontWeight="Bold"
+                        Text="{Binding WindowText}"
+                        ToolTip="{Binding WindowSecondsText}" />
+
+                    <StackPanel
+                        Grid.Row="3"
+                        Grid.Column="0"
+                        Grid.ColumnSpan="5"
+                        Margin="0,2,0,0"
+                        Orientation="Horizontal"
+                        ToolTip="{Binding Labels.SessionTooltip}">
+                        <TextBlock
+                            FontSize="11"
+                            Foreground="{DynamicResource ButtonForegroundDisabledBrush}"
+                            Text="{Binding StartDateTimeText}" />
+                        <TextBlock
+                            FontSize="11"
+                            Foreground="{DynamicResource ButtonForegroundDisabledBrush}"
+                            Text="  →  " />
+                        <TextBlock
+                            FontSize="11"
+                            Foreground="{DynamicResource ButtonForegroundDisabledBrush}"
+                            Text="{Binding EndDateTimeText}" />
+                    </StackPanel>
+                </Grid>
+            </GroupBox>
+
+            <GroupBox
+                Margin="0,10,0,0"
+                Padding="0,4,0,6"
+                Header="{Binding Labels.ExposureGroupHeader}">
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" MinWidth="118" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" MinWidth="86" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock
+                            Grid.Column="0"
+                            Margin="0,0,6,0"
+                            VerticalAlignment="Center"
+                            Text="{Binding Labels.ExposureLabel}" />
+                        <ninactrl:StepperControl
+                            Grid.Column="1"
+                            Margin="0,2"
+                            MaxValue="{Binding MaxExposureSeconds}"
+                            MinValue="{Binding MinExposureSeconds}"
+                            StepSize="{Binding ExposureStepSeconds}"
+                            ToolTip="{Binding Labels.ExposureTooltip}"
+                            Value="{Binding ExposureSeconds, Mode=TwoWay}">
+                            <ninactrl:StepperControl.InnerContent>
+                                <ninactrl:UnitTextBox
+                                    VerticalContentAlignment="Center"
+                                    Text="{Binding ExposureSecondsText, Mode=TwoWay}"
+                                    TextAlignment="Center"
+                                    Unit="s" />
+                            </ninactrl:StepperControl.InnerContent>
+                        </ninactrl:StepperControl>
+                        <TextBlock
+                            Grid.Column="2"
+                            Margin="6,0"
+                            VerticalAlignment="Center"
+                            FontSize="16"
+                            FontWeight="Bold"
+                            Text="=" />
+                        <TextBox
+                            Grid.Column="3"
+                            Margin="0,2"
+                            VerticalContentAlignment="Center"
+                            IsReadOnly="True"
+                            IsReadOnlyCaretVisible="False"
+                            Text="{Binding ExposureMinutesInfo, Mode=OneWay}"
+                            TextAlignment="Center"
+                            ToolTip="{Binding Labels.ExposureMinutesTooltip}" />
+                    </Grid>
+
+                    <TextBlock
+                        Margin="0,4,0,0"
+                        HorizontalAlignment="Right"
+                        FontSize="11"
+                        Foreground="{DynamicResource ButtonForegroundDisabledBrush}"
+                        Text="{Binding ExposureDecimalMinutes}" />
+
+                    <Button
+                        Height="26"
+                        Margin="0,8,0,0"
+                        Command="{Binding UseNightTimesCommand}"
+                        Content="{Binding Labels.NightButtonText}"
+                        ToolTip="{Binding Labels.NightButtonTooltip}" />
+                    <TextBlock
+                        Margin="0,4,0,0"
+                        FontSize="11"
+                        Foreground="{DynamicResource ButtonForegroundDisabledBrush}"
+                        Text="{Binding NightInfoText}"
+                        TextWrapping="Wrap" />
+                </StackPanel>
+            </GroupBox>
+
+            <GroupBox
+                Margin="0,12,0,0"
+                Padding="0,4,0,8"
+                Header="{Binding Labels.ResultGroupHeader}">
+                <StackPanel>
+                    <TextBlock
+                        HorizontalAlignment="Center"
+                        FontSize="46"
+                        FontWeight="Bold"
+                        Text="{Binding PoseCountText}" />
+                    <TextBlock
+                        HorizontalAlignment="Center"
+                        Text="{Binding ResultDetailText}"
+                        TextWrapping="Wrap" />
+                    <TextBlock
+                        Margin="0,4,0,0"
+                        HorizontalAlignment="Center"
+                        FontSize="11"
+                        Foreground="{DynamicResource ButtonForegroundDisabledBrush}"
+                        Text="{Binding RoundingText}"
+                        TextWrapping="Wrap" />
+                    <TextBlock
+                        Margin="0,8,0,0"
+                        Text="{Binding CoverageText}"
+                        TextWrapping="Wrap" />
+                    <TextBlock
+                        Margin="0,2,0,0"
+                        Text="{Binding PoseEndDateTimeText}"
+                        TextWrapping="Wrap" />
+
+                    <Button
+                        Height="26"
+                        Margin="0,10,0,0"
+                        Command="{Binding CopyResultCommand}"
+                        Content="{Binding Labels.CopyButtonText}"
+                        ToolTip="{Binding Labels.CopyButtonTooltip}" />
+                    <TextBlock
+                        Margin="0,4,0,0"
+                        HorizontalAlignment="Center"
+                        FontSize="11"
+                        Foreground="{DynamicResource ButtonForegroundDisabledBrush}"
+                        Text="{Binding CopyFeedbackText}"
+                        TextWrapping="Wrap"
+                        Visibility="{Binding HasCopyFeedback, Converter={StaticResource BoolToVisibility}}" />
+                </StackPanel>
+            </GroupBox>
+
+            <Border
+                Margin="0,8,0,0"
+                Padding="6"
+                Background="{DynamicResource NotificationWarningBrush}"
+                Visibility="{Binding HasWarning, Converter={StaticResource BoolToVisibility}}">
+                <TextBlock
+                    Foreground="{DynamicResource NotificationWarningTextBrush}"
+                    Text="{Binding WarningText}"
+                    TextWrapping="Wrap" />
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

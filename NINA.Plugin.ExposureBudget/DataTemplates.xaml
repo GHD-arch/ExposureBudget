@@ -1,0 +1,19 @@
+<ResourceDictionary
+    x:Class="NINA.Plugin.ExposureBudget.DataTemplates"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:view="clr-namespace:NINA.Plugin.ExposureBudget.View"
+    xmlns:vm="clr-namespace:NINA.Plugin.ExposureBudget.ViewModel">
+
+    <!--
+        N.I.N.A. résout le contenu d'un panneau de plugin via la clé
+        "<Type complet du ViewModel>_Dockable" (voir NINA.Utility.AvalonDock.PaneTemplateSelector).
+        La clé ci-dessous ne doit donc pas être renommée.
+    -->
+    <DataTemplate
+        x:Key="NINA.Plugin.ExposureBudget.ViewModel.ExposureBudgetVM_Dockable"
+        DataType="{x:Type vm:ExposureBudgetVM}">
+        <view:ExposureBudgetView />
+    </DataTemplate>
+
+</ResourceDictionary>

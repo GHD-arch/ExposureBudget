@@ -1,0 +1,66 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>ExposureBudget.SmokeTest</AssemblyName>
+    <RootNamespace>NINA.Plugin.ExposureBudget.SmokeTest</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
+    <StartupObject>NINA.Plugin.ExposureBudget.SmokeTest.Program</StartupObject>
+    <NinaSdkPath Condition="'$(NinaSdkPath)' == ''">C:\Program Files\N.I.N.A. - Nighttime Imaging 'N' Astronomy</NinaSdkPath>
+    <!-- Conflit de versions transitif sur System.Text.Json (voir le projet du plugin). -->
+    <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);MSB3277</MSBuildWarningsAsMessages>
+  </PropertyGroup>
+
+  <!-- Harnais de fumee : il charge reellement le plugin comme le fait N.I.N.A.
+       (composition MEF des exports, fusion du ResourceDictionary, recherche du
+       DataTemplate par la cle "<Type>_Dockable", instanciation de la vue).
+       Les assemblies N.I.N.A. sont copiees dans la sortie du harnais (Private=true)
+       afin qu'il soit autonome ; le plugin installe, lui, ne les embarque jamais. -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\NINA.Plugin.ExposureBudget\NINA.Plugin.ExposureBudget.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="NINA.Plugin">
+      <HintPath>$(NinaSdkPath)\NINA.Plugin.dll</HintPath>
+    </Reference>
+    <Reference Include="NINA.Core">
+      <HintPath>$(NinaSdkPath)\NINA.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="NINA.Astrometry">
+      <HintPath>$(NinaSdkPath)\NINA.Astrometry.dll</HintPath>
+    </Reference>
+    <Reference Include="NINA.Profile">
+      <HintPath>$(NinaSdkPath)\NINA.Profile.dll</HintPath>
+    </Reference>
+    <Reference Include="NINA.Equipment">
+      <HintPath>$(NinaSdkPath)\NINA.Equipment.dll</HintPath>
+    </Reference>
+    <Reference Include="NINA.CustomControlLibrary">
+      <HintPath>$(NinaSdkPath)\NINA.CustomControlLibrary.dll</HintPath>
+    </Reference>
+    <Reference Include="NINA.WPF.Base">
+      <HintPath>$(NinaSdkPath)\NINA.WPF.Base.dll</HintPath>
+    </Reference>
+    <Reference Include="System.ComponentModel.Composition">
+      <HintPath>$(NinaSdkPath)\System.ComponentModel.Composition.dll</HintPath>
+    </Reference>
+    <!-- Le harnais reproduit l'ensemble d'assemblies de N.I.N.A. : ces deux-la sont
+         necessaires a NJsonSchema / NINA.Plugin au moment de l'execution. -->
+    <Reference Include="System.Text.Json">
+      <HintPath>$(NinaSdkPath)\System.Text.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Text.Encodings.Web">
+      <HintPath>$(NinaSdkPath)\System.Text.Encodings.Web.dll</HintPath>
+    </Reference>
+    <Reference Include="CommunityToolkit.Mvvm">
+      <HintPath>$(NinaSdkPath)\CommunityToolkit.Mvvm.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+</Project>

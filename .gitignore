@@ -1,0 +1,12 @@
+# Sorties de compilation
+bin/
+obj/
+
+# Outils et caches locaux
+.dotnet-cli/
+.vs/
+*.user
+*.suo
+
+# Reglages locaux du plugin (crees a cote du dll installe)
+ExposureBudget.settings
