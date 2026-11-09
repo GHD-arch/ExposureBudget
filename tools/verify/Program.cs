@@ -2,6 +2,7 @@ using NINA.Plugin.ExposureBudget.Model;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 
 namespace NINA.Plugin.ExposureBudget.Verify {
 
@@ -101,6 +102,155 @@ namespace NINA.Plugin.ExposureBudget.Verify {
             CheckThrows("Temps de pose negatif refuse", -15d);
             CheckThrows("Temps de pose NaN refuse", double.NaN);
             CheckThrows("Temps de pose infini refuse", double.PositiveInfinity);
+
+            Section("9. Plan par filtres : repartition, totaux et controles");
+            var quatreHeures = TimeSpan.FromHours(4);
+            var plan = new List<FilterPlanEntry> {
+                new FilterPlanEntry("L", true, 120d, 40),
+                new FilterPlanEntry("R", true, 120d, 15),
+                new FilterPlanEntry("G", true, 120d, 15),
+                new FilterPlanEntry("B", true, 120d, 15),
+                new FilterPlanEntry("S", true, 300d, 5),
+                new FilterPlanEntry("H", true, 300d, 7),
+                new FilterPlanEntry("O", true, 300d, 3)
+            };
+            var resultat = FilterPlanCalculator.Compute(quatreHeures, plan);
+            CheckEqual("Plan : L a 40 % de 4 h avec 120 s -> 48 poses", 48, resultat.Lines[0].Count);
+            CheckEqual("Plan : R a 15 % avec 120 s -> 18 poses", 18, resultat.Lines[1].Count);
+            CheckEqual("Plan : S a 5 % avec 300 s (2,40) -> 2 poses", 2, resultat.Lines[4].Count);
+            CheckEqual("Plan : H a 7 % avec 300 s (3,36) -> 3 poses", 3, resultat.Lines[5].Count);
+            CheckEqual("Plan : O a 3 % avec 300 s (1,44) -> 1 pose", 1, resultat.Lines[6].Count);
+            CheckEqual("Plan : total des pourcentages", 100, resultat.TotalPercent);
+            CheckEqual("Plan : total des poses", 108, resultat.TotalCount);
+            CheckEqual("Plan : temps couvert", 14040d, resultat.TotalCovered.TotalSeconds);
+            CheckEqual("Plan : reliquat de 6 min perdu par les arrondis", 360d, resultat.Remaining.TotalSeconds);
+            CheckEqual("Plan : aucun depassement de pourcentage", false, resultat.PercentOverflow);
+            CheckEqual("Plan : aucun depassement de fenetre", false, resultat.CoverageOverflow);
+            CheckEqual("Plan : plan valide", true, resultat.IsValid);
+            CheckEqual("Plan : aucun point de pourcentage inutilise", 0, resultat.UnusedPercent);
+
+            // Un seul filtre a 100 % doit donner exactement le calcul simple : une seule regle.
+            var fenetre = TimeSpan.FromMinutes(345);
+            var seul = FilterPlanCalculator.Compute(fenetre, new[] { new FilterPlanEntry("L", true, 300d, 100) });
+            var simple = ExposureBudgetCalculator.Compute(fenetre, 300d);
+            CheckEqual("Plan : un filtre a 100 % donne le meme nombre que le calcul simple", simple.Count, seul.Lines[0].Count);
+            CheckEqual("Plan : et le meme temps couvert", simple.CoveredSeconds, (decimal)seul.TotalCovered.TotalSeconds);
+
+            // Pourcentages > 100 : refus, mais les nombres restent affiches.
+            var depassementPourcent = FilterPlanCalculator.Compute(quatreHeures, new[] {
+                new FilterPlanEntry("L", true, 120d, 60),
+                new FilterPlanEntry("R", true, 120d, 60)
+            });
+            CheckEqual("Plan : 60 % + 60 % -> depassement de pourcentage", true, depassementPourcent.PercentOverflow);
+            CheckEqual("Plan : plan invalide", false, depassementPourcent.IsValid);
+            CheckEqual("Plan : poses tout de meme calculees", 2, depassementPourcent.Lines.Count(x => x.Count > 0));
+
+            // Arrondi qui fait depasser la fenetre : refus avec le depassement chiffre.
+            var depassementTemps = FilterPlanCalculator.Compute(TimeSpan.FromSeconds(1000), new[] {
+                new FilterPlanEntry("L", true, 600d, 100)
+            });
+            CheckEqual("Plan : 1,667 pose arrondie a 2 -> depassement de fenetre", true, depassementTemps.CoverageOverflow);
+            CheckEqual("Plan : depassement de 200 s", 200d, depassementTemps.Overrun.TotalSeconds);
+            CheckEqual("Plan : depassement -> plan invalide", false, depassementTemps.IsValid);
+
+            // Filtres decoches : exclus des totaux, affiches a zero.
+            var partiel = FilterPlanCalculator.Compute(quatreHeures, new[] {
+                new FilterPlanEntry("L", true, 120d, 50),
+                new FilterPlanEntry("R", false, 120d, 50)
+            });
+            CheckEqual("Plan : seuls les filtres coches comptent", 50, partiel.TotalPercent);
+            CheckEqual("Plan : un seul filtre actif", 1, partiel.EnabledCount);
+            CheckEqual("Plan : filtre decoche -> 0 pose", 0, partiel.Lines[1].Count);
+            CheckEqual("Plan : points de pourcentage inutilises", 50, partiel.UnusedPercent);
+
+            var vide = FilterPlanCalculator.Compute(quatreHeures, new[] { new FilterPlanEntry("L", false, 120d, 40) });
+            CheckEqual("Plan : aucun filtre actif signale", true, vide.IsEmpty);
+            CheckEqual("Plan : aucun filtre actif -> invalide", false, vide.IsValid);
+
+            var fenetreNulle = FilterPlanCalculator.Compute(TimeSpan.Zero, new[] { new FilterPlanEntry("L", true, 120d, 100) });
+            CheckEqual("Plan : fenetre nulle -> 0 pose", 0, fenetreNulle.TotalCount);
+
+            var poseNulle = FilterPlanCalculator.Compute(quatreHeures, new[] { new FilterPlanEntry("L", true, 0d, 100) });
+            CheckEqual("Plan : temps de pose nul -> 0 pose", 0, poseNulle.TotalCount);
+            CheckEqual("Plan : temps de pose nul signale", false, poseNulle.Lines[0].HasValidExposure);
+
+            Section("11. Surcharge par pose et temps a reserver");
+            var fenetre345 = TimeSpan.FromMinutes(345);   // 5 h 45 = 20 700 s
+            var sansSurcharge = ExposureBudgetCalculator.Compute(fenetre345, 300d);
+            var avecSurcharge = ExposureBudgetCalculator.Compute(fenetre345, 300d, 5d, null);
+            CheckEqual("Surcharge : sans surcharge -> 69 poses", 69, sansSurcharge.Count);
+            CheckEqual("Surcharge : 20 700 / (300 + 5) = 67,87 -> 68 poses", 68, avecSurcharge.Count);
+            CheckEqual("Surcharge : cout par pose", 305m, avecSurcharge.PerPoseSeconds);
+            CheckEqual("Surcharge : temps couvert (expositions seules)", 20400m, avecSurcharge.CoveredSeconds);
+            CheckEqual("Surcharge : temps consomme", 20740m, avecSurcharge.ConsumedSeconds);
+            CheckEqual("Surcharge : arrondi au-dessus -> depassement de 40 s", true, avecSurcharge.Overflows);
+
+            var propre = ExposureBudgetCalculator.Compute(fenetre345, 250d, 2d, null);
+            CheckEqual("Surcharge : 20 700 / 252 = 82,14 -> 82 poses", 82, propre.Count);
+            CheckEqual("Surcharge : 82 x 252 = 20 664 consommees", 20664m, propre.ConsumedSeconds);
+            CheckEqual("Surcharge : reliquat de 36 s", 36m, propre.RemainingSeconds);
+            CheckEqual("Surcharge nulle = calcul d'origine", 69, ExposureBudgetCalculator.Compute(fenetre345, 300d, 0d, null).Count);
+
+            var reserves = new NightReserves { FlipMinutes = 10d, FixedMinutes = 5d };
+            var avecReserves = ExposureBudgetCalculator.Compute(fenetre345, 300d, 0d, reserves);
+            CheckEqual("Reserves : 15 min reservees", 900d, avecReserves.ReservedSeconds.TotalSeconds);
+            CheckEqual("Reserves : fenetre exploitable de 5 h 30", 19800d, avecReserves.UsableWindow.TotalSeconds);
+            CheckEqual("Reserves : 19 800 / 300 = 66 poses", 66, avecReserves.Count);
+
+            // Autofocus toutes les 10 poses : le nombre de passages depend du nombre de poses.
+            var reservesAutofocus = new NightReserves { FlipMinutes = 10d, FixedMinutes = 5d, AutofocusEvery = 10, AutofocusSeconds = 60d };
+            var avecAutofocus = ExposureBudgetCalculator.Compute(fenetre345, 300d, 0d, reservesAutofocus);
+            CheckEqual("Autofocus : 65 poses apres iteration", 65, avecAutofocus.Count);
+            CheckEqual("Autofocus : 6 passages -> 21 min reservees", 1260d, avecAutofocus.ReservedSeconds.TotalSeconds);
+            CheckEqual("Autofocus : fenetre exploitable de 5 h 24", 19440d, avecAutofocus.UsableWindow.TotalSeconds);
+
+            var reservesTrop = new NightReserves { FlipMinutes = 400d };
+            var avecTrop = ExposureBudgetCalculator.Compute(fenetre345, 300d, 0d, reservesTrop);
+            CheckEqual("Reserves > fenetre : 0 pose", 0, avecTrop.Count);
+            CheckEqual("Reserves > fenetre signale", true, avecTrop.ReservesExceedWindow);
+
+            var autofocusSeul = new NightReserves { AutofocusEvery = 10, AutofocusSeconds = 60d };
+            CheckEqual("Autofocus : 25 poses -> 2 passages", 2, autofocusSeul.AutofocusCount(25));
+            CheckEqual("Autofocus : total de 2 x 60 s", 120d, autofocusSeul.Total(25).TotalSeconds);
+            CheckEqual("Aucune reserve par defaut", true, new NightReserves().IsEmpty);
+
+            var planAvecSurcharge = FilterPlanCalculator.Compute(fenetre345,
+                new[] { new FilterPlanEntry("L", true, 300d, 100) }, 5d);
+            CheckEqual("Plan : surcharge -> 68 poses", 68, planAvecSurcharge.Lines[0].Count);
+            CheckEqual("Plan : temps consomme avec surcharge", 20740d, planAvecSurcharge.TotalConsumed.TotalSeconds);
+            CheckEqual("Plan : depassement detecte sur le temps consomme", true, planAvecSurcharge.CoverageOverflow);
+
+            Section("12. Plan par filtres : repartition automatique");
+            var aRepartir = new List<FilterPlanEntry> {
+                new FilterPlanEntry("L", true, 120d, 0),
+                new FilterPlanEntry("R", true, 120d, 0),
+                new FilterPlanEntry("G", true, 120d, 0),
+                new FilterPlanEntry("B", true, 120d, 0)
+            };
+            FilterPlanCalculator.DistributeEvenly(aRepartir);
+            CheckEqual("Repartition : 4 filtres -> 25 % chacun", 100, aRepartir.Sum(x => x.Percent));
+            CheckEqual("Repartition : chaque filtre a 25 %", 25, aRepartir[0].Percent);
+
+            var sept = new List<FilterPlanEntry> {
+                new FilterPlanEntry("L", true, 120d, 0), new FilterPlanEntry("R", true, 120d, 0),
+                new FilterPlanEntry("G", true, 120d, 0), new FilterPlanEntry("B", true, 120d, 0),
+                new FilterPlanEntry("S", true, 300d, 0), new FilterPlanEntry("H", true, 300d, 0),
+                new FilterPlanEntry("O", true, 300d, 0)
+            };
+            FilterPlanCalculator.DistributeEvenly(sept);
+            CheckEqual("Repartition : 7 filtres totalisent 100 %", 100, sept.Sum(x => x.Percent));
+            CheckEqual("Repartition : les premiers filtres prennent le reliquat", 15, sept[0].Percent);
+            CheckEqual("Repartition : le dernier recoit la part de base", 10, sept[6].Percent);
+
+            var avecDecoches = new List<FilterPlanEntry> {
+                new FilterPlanEntry("L", true, 120d, 40),
+                new FilterPlanEntry("R", false, 120d, 30),
+                new FilterPlanEntry("G", true, 120d, 0)
+            };
+            FilterPlanCalculator.DistributeEvenly(avecDecoches);
+            CheckEqual("Repartition : filtres decoches remis a 0 %", 0, avecDecoches[1].Percent);
+            CheckEqual("Repartition : 2 filtres actifs -> 50 % pour le premier", 50, avecDecoches[0].Percent);
+            CheckEqual("Repartition : 2 filtres actifs -> 50 % pour le second", 50, avecDecoches[2].Percent);
 
             Console.WriteLine();
             Console.WriteLine(failures == 0

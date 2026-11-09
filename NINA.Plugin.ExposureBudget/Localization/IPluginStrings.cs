@@ -69,6 +69,118 @@ namespace NINA.Plugin.ExposureBudget.Localization {
 
         #endregion Libelles du panneau
 
+        #region Plan par filtres
+
+        /// <summary>Onglet du calcul simple (fenetre + une seule pose).</summary>
+        string TabSingleExposure { get; }
+
+        /// <summary>Onglet du plan par filtres.</summary>
+        string TabFilterPlan { get; }
+
+        string FilterColumn { get; }
+
+        string FilterExposureColumn { get; }
+
+        string FilterPercentColumn { get; }
+
+        string FilterCountColumn { get; }
+
+        /// <summary>Bouton qui coche tous les filtres.</summary>
+        string FilterCheckAllButton { get; }
+
+        /// <summary>Bouton qui repartit 100 % entre les filtres coches.</summary>
+        string FilterDistributeButton { get; }
+
+        /// <summary>Bouton qui remet le plan a ses valeurs par defaut.</summary>
+        string FilterResetButton { get; }
+
+        /// <summary>Ligne de totaux : {0} % total, {1} nombre de poses avec son mot, {2} duree couverte.</summary>
+        string FilterTotalsFormat { get; }
+
+        /// <summary>Temps restant : {0} duree.</summary>
+        string FilterRemainingFormat { get; }
+
+        /// <summary>Erreur de saisie : {0} % au total, maximum 100 %.</summary>
+        string FilterPercentOverflowFormat { get; }
+
+        /// <summary>Refus : les poses arrondies depassent la fenetre de {0}.</summary>
+        string FilterCoverageOverflowFormat { get; }
+
+        /// <summary>Aucun filtre coche.</summary>
+        string FilterEmptyWarning { get; }
+
+        string FilterExposureTooltip { get; }
+
+        string FilterPercentTooltip { get; }
+
+        /// <summary>Bouton par ligne qui donne les pourcentages non utilises a ce filtre.</summary>
+        string FilterRemainderButton { get; }
+
+        string FilterRemainderTooltip { get; }
+
+        /// <summary>Ajout / suppression de lignes dans la liste des filtres.</summary>
+        string FilterAddButton { get; }
+
+        string FilterAddTooltip { get; }
+
+        string FilterRemoveButton { get; }
+
+        string FilterRemoveTooltip { get; }
+
+        /// <summary>Nom propose pour un filtre ajoute.</summary>
+        string FilterNewName { get; }
+
+        string FilterNameTooltip { get; }
+
+        /// <summary>Bouton qui copie le plan (une ligne par filtre).</summary>
+        string FilterPlanCopyButton { get; }
+
+        string FilterPlanCopyTooltip { get; }
+
+        string FilterPlanCopyFeedback { get; }
+
+        /// <summary>Ligne du plan copiee : {0} filtre, {1} poses, {2} temps de pose, {3} duree couverte.</summary>
+        string FilterPlanLineFormat { get; }
+
+        #region Surcharge et temps a reserver
+
+        string OverheadLabel { get; }
+
+        string OverheadTooltip { get; }
+
+        /// <summary>Temps consomme par une pose : {0} duree.</summary>
+        string OverheadInfoFormat { get; }
+
+        /// <summary>Detail du calcul avec surcharge : fenetre, pose, surcharge, exact, poses, mot.</summary>
+        string OverheadDetailFormat { get; }
+
+        string ReservesTabTitle { get; }
+
+        string ReservesIntro { get; }
+
+        string FlipReserveLabel { get; }
+
+        string FixedReserveLabel { get; }
+
+        string AutofocusEveryLabel { get; }
+
+        string AutofocusDurationLabel { get; }
+
+        /// <summary>Resume : {0} temps reserve, {1} fenetre exploitable.</summary>
+        string ReservesSummaryFormat { get; }
+
+        string ReservesEmptyHint { get; }
+
+        /// <summary>Avertissement : les reserves depassent la fenetre de {0}.</summary>
+        string ReservesExceedFormat { get; }
+
+        /// <summary>Surcharge incluse dans le plan : {0} par pose.</summary>
+        string PlanOverheadHintFormat { get; }
+
+        #endregion Surcharge et temps a reserver
+
+        #endregion Plan par filtres
+
         #region Fiche du plugin (Options > Plugins)
 
         /// <summary>
@@ -130,7 +242,7 @@ namespace NINA.Plugin.ExposureBudget.Localization {
 
         string NightSun { get; }
 
-        string NightInfoFormat { get; }
+        string NightFallbackInfoFormat { get; }
 
         string NightCalculatorUnavailableWarning { get; }
 

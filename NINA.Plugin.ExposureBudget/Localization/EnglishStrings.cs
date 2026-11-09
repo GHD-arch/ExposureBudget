@@ -1,3 +1,4 @@
+using System;
 using System.Globalization;
 
 namespace NINA.Plugin.ExposureBudget.Localization {
@@ -59,16 +60,128 @@ namespace NINA.Plugin.ExposureBudget.Localization {
 
         public string CopyFailedFeedback => "Could not access the clipboard.";
 
-        public string PluginShortDescription => "Computes how many exposures of a given duration fit between a start time and an end time, taking the midnight rollover into account.";
+        #region Plan par filtres
+
+        public string TabSingleExposure => "Single exposure";
+
+        public string TabFilterPlan => "Filter plan";
+
+        public string FilterColumn => "Filter";
+
+        public string FilterExposureColumn => "Exposure (s)";
+
+        public string FilterPercentColumn => "%";
+
+        public string FilterCountColumn => "Exposures";
+
+        public string FilterCheckAllButton => "Check all";
+
+        public string FilterDistributeButton => "Split 100 %";
+
+        public string FilterResetButton => "Reset";
+
+        public string FilterTotalsFormat => "{0} % · {1} {2} · {3}";
+
+        public string FilterRemainingFormat => "Remaining {0}";
+
+        public string FilterPercentOverflowFormat => "Percentages total {0} % (maximum 100 %).";
+
+        public string FilterCoverageOverflowFormat => "Rounded exposures exceed the window by {0}: reduce a percentage or an exposure time.";
+
+        public string FilterEmptyWarning => "No filter selected.";
+
+        public string FilterExposureTooltip => "Exposure time of this filter; 5 s steps with the arrows, free typing allowed";
+
+        public string FilterPercentTooltip => "Share of the available time allocated to this filter";
+
+        public string FilterRemainderButton => ">";
+
+        public string FilterRemainderTooltip => "Give the unused percentages to this filter";
+
+        public string FilterAddButton => "+ filter";
+
+        public string FilterAddTooltip => "Add a filter at the end of the list";
+
+        public string FilterRemoveButton => "- filter";
+
+        public string FilterRemoveTooltip => "Remove the last filter of the list";
+
+        public string FilterNewName => "New";
+
+        public string FilterNameTooltip => "Filter name, editable";
+
+        public string FilterPlanCopyButton => "Copy plan";
+
+        public string FilterPlanCopyTooltip => "Copies one line per filter, with its exposures and covered time";
+
+        public string FilterPlanCopyFeedback => "Filter plan copied to the clipboard.";
+
+        public string FilterPlanLineFormat => "{0} : {1} × {2} s ({3})";
+
+        public string OverheadLabel => "Overhead";
+
+        public string OverheadTooltip => "Time consumed by each exposure on top of the exposure itself (download, dither, stabilisation); 1 s steps";
+
+        public string OverheadInfoFormat => "= {0} per exposure";
+
+        public string OverheadDetailFormat => "Window {0} ÷ ({1} + {2} overhead) = {3} → {4} {5}";
+
+        public string ReservesTabTitle => "Night reserves";
+
+        public string ReservesIntro => "Deducts the operations that will not take exposures, so the count fits the real night.";
+
+        public string FlipReserveLabel => "Meridian flip (min)";
+
+        public string FixedReserveLabel => "Fixed margin (min)";
+
+        public string AutofocusEveryLabel => "Autofocus every (exposures, 0 = off)";
+
+        public string AutofocusDurationLabel => "Autofocus duration (s)";
+
+        public string ReservesSummaryFormat => "Reserved {0} · usable {1}";
+
+        public string ReservesEmptyHint => "No reserve: the whole window is available.";
+
+        public string ReservesExceedFormat => "The reserves exceed the window by {0}.";
+
+        public string PlanOverheadHintFormat => "Includes {0} per exposure";
+
+        #endregion Plan par filtres
+
+        public string PluginShortDescription => "Plans a session: how many exposures fit between dusk and dawn, with an optional filter plan per percentage of the night — overhead, meridian flip, autofocus and safety margin included.";
 
         public string PluginLongDescription =>
-            "Exposure Budget works out how many exposures of a given duration can be captured between the start " +
-            "and the end of a session, including sessions that run past midnight. The exposure count follows the " +
-            "requested rule: a decimal part below 0.5 rounds down, 0.5 and above adds one more exposure. " +
-            "The acquisition window can be filled in automatically from the astronomical night that N.I.N.A. " +
-            "computes for your observatory profile. The panel and this description follow the N.I.N.A. user " +
-            "interface language (English or French, or forced with language=en / language=fr in " +
-            "ExposureBudget.settings).";
+            "Exposure Budget works out how many exposures fit between a start time and an end time, including " +
+            "sessions that run past midnight — and, for a mono camera, how to share that night between filters." +
+            Environment.NewLine + Environment.NewLine +
+            "SESSION WINDOW" + Environment.NewLine +
+            "Start and end times use the 24 hour clock, adjusted with steppers. The panel shows the available " +
+            "duration, the exact dates of the session (so a session ending the next morning is explicit) and a " +
+            "warning when both times are identical. The Astronomical night button fills both times from the dusk " +
+            "and dawn computed by N.I.N.A. for your observatory profile, falling back to nautical twilight, civil " +
+            "twilight or sunset when the astronomical twilight does not exist at your latitude. Now sets the start " +
+            "to the current time, to see what is left to do in the middle of a session." + Environment.NewLine + Environment.NewLine +
+            "EXPOSURE COUNT" + Environment.NewLine +
+            "One exposure of any duration, adjusted with 15 second steps, with its equivalent in minutes. The count " +
+            "follows the requested rule: a decimal part below 0.5 rounds down, 0.5 and above adds one more exposure. " +
+            "The panel shows the exact value, the rounding applied, the time covered, what is left and the end time " +
+            "of the last exposure. Everything is recomputed as you type: there is no Calculate button, and the " +
+            "number can be copied to the clipboard in one click." + Environment.NewLine + Environment.NewLine +
+            "A REALISTIC NIGHT" + Environment.NewLine +
+            "An optional overhead per exposure (download, dither, stabilisation) makes each exposure cost its " +
+            "duration plus that overhead, and optional reserves are deducted from the window before counting: " +
+            "meridian flip, autofocus every N exposures and a safety margin. The count is then the one you will " +
+            "really achieve." + Environment.NewLine + Environment.NewLine +
+            "MONO CAMERAS AND FILTERS" + Environment.NewLine +
+            "The Filter plan tab shares the same window: one row per filter with a checkbox, an exposure time and " +
+            "a percentage of the available time. Each row shows its own exposure count, the totals stay within " +
+            "100 %, and the plan is refused when the rounded exposures would exceed the window, so a plan can never " +
+            "promise more than the night holds. A single line per filter can be copied, ready to fill in a sequence." + Environment.NewLine + Environment.NewLine +
+            "SETTINGS AND LANGUAGE" + Environment.NewLine +
+            "The last settings (times, exposure, overhead, reserves and filter plan) are remembered in " +
+            "ExposureBudget.settings, a small text file next to the plugin that can be edited by hand. The panel " +
+            "and this description follow the N.I.N.A. interface language: English or French, forceable with " +
+            "language=en or language=fr in that file.";
 
         public string EmptyCountDisplay => "–";
 
@@ -112,7 +225,7 @@ namespace NINA.Plugin.ExposureBudget.Localization {
 
         public string NightSun => "Sunset / sunrise";
 
-        public string NightInfoFormat => "{0} on {1:dd/MM/yyyy}: {2:HH:mm} → {3:HH:mm} on {4:dd/MM/yyyy}.";
+        public string NightFallbackInfoFormat => "No astronomical twilight that night: using {0}.";
 
         public string NightCalculatorUnavailableWarning => "The N.I.N.A. night calculator is not available: enter the times manually.";
 

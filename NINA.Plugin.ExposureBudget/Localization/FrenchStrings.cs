@@ -1,3 +1,4 @@
+using System;
 using System.Globalization;
 
 namespace NINA.Plugin.ExposureBudget.Localization {
@@ -59,16 +60,130 @@ namespace NINA.Plugin.ExposureBudget.Localization {
 
         public string CopyFailedFeedback => "Accès au presse-papiers impossible.";
 
-        public string PluginShortDescription => "Calcule combien de poses d'une durée donnée tiennent entre une heure de début et une heure de fin, en tenant compte du passage de minuit.";
+        #region Plan par filtres
+
+        public string TabSingleExposure => "Pose unique";
+
+        public string TabFilterPlan => "Plan par filtres";
+
+        public string FilterColumn => "Filtre";
+
+        public string FilterExposureColumn => "Pose (s)";
+
+        public string FilterPercentColumn => "%";
+
+        public string FilterCountColumn => "Poses";
+
+        public string FilterCheckAllButton => "Tout cocher";
+
+        public string FilterDistributeButton => "Répartir 100 %";
+
+        public string FilterResetButton => "Réinitialiser";
+
+        public string FilterTotalsFormat => "{0} % · {1} {2} · {3}";
+
+        public string FilterRemainingFormat => "Reste {0}";
+
+        public string FilterPercentOverflowFormat => "Total des pourcentages : {0} % (maximum 100 %).";
+
+        public string FilterCoverageOverflowFormat => "Les poses arrondies dépassent la fenêtre de {0} : réduisez un pourcentage ou un temps de pose.";
+
+        public string FilterEmptyWarning => "Aucun filtre sélectionné.";
+
+        public string FilterExposureTooltip => "Temps de pose de ce filtre ; pas de 5 s avec les flèches, saisie libre au clavier";
+
+        public string FilterPercentTooltip => "Part du temps disponible allouée à ce filtre";
+
+        public string FilterRemainderButton => ">";
+
+        public string FilterRemainderTooltip => "Attribuer les pourcentages non utilisés à ce filtre";
+
+        public string FilterAddButton => "+ filtre";
+
+        public string FilterAddTooltip => "Ajouter un filtre en fin de liste";
+
+        public string FilterRemoveButton => "- filtre";
+
+        public string FilterRemoveTooltip => "Supprimer le dernier filtre de la liste";
+
+        public string FilterNewName => "Nouveau";
+
+        public string FilterNameTooltip => "Nom du filtre, modifiable";
+
+        public string FilterPlanCopyButton => "Copier le plan";
+
+        public string FilterPlanCopyTooltip => "Copie une ligne par filtre, avec ses poses et le temps couvert";
+
+        public string FilterPlanCopyFeedback => "Plan par filtres copié dans le presse-papiers.";
+
+        public string FilterPlanLineFormat => "{0} : {1} × {2} s ({3})";
+
+        public string OverheadLabel => "Surcharge";
+
+        public string OverheadTooltip => "Temps consommé par chaque pose en plus de l'exposition elle-même (téléchargement, dither, stabilisation) ; pas de 1 s";
+
+        public string OverheadInfoFormat => "= {0} par pose";
+
+        public string OverheadDetailFormat => "Fenêtre {0} ÷ ({1} + {2} de surcharge) = {3} → {4} {5}";
+
+        public string ReservesTabTitle => "Temps à réserver";
+
+        public string ReservesIntro => "Déduit de la fenêtre les opérations qui ne prendront pas de poses, pour que le nombre tienne dans la vraie nuit.";
+
+        public string FlipReserveLabel => "Retournement au méridien (min)";
+
+        public string FixedReserveLabel => "Marge fixe (min)";
+
+        public string AutofocusEveryLabel => "Autofocus toutes les (poses, 0 = arrêt)";
+
+        public string AutofocusDurationLabel => "Durée d'un autofocus (s)";
+
+        public string ReservesSummaryFormat => "Réservé {0} · exploitable {1}";
+
+        public string ReservesEmptyHint => "Aucune réserve : toute la fenêtre est disponible.";
+
+        public string ReservesExceedFormat => "Les temps réservés dépassent la fenêtre de {0}.";
+
+        public string PlanOverheadHintFormat => "Surcharge de {0} par pose incluse";
+
+        #endregion Plan par filtres
+
+        public string PluginShortDescription => "Planifie une séance : combien de poses tiennent entre le crépuscule et l'aube, avec un plan par filtres en pourcentage de la nuit — surcharge, retournement au méridien, autofocus et marge de sécurité compris.";
 
         public string PluginLongDescription =>
-            "Exposure Budget détermine combien de poses d'une durée donnée peuvent être capturées entre le début " +
-            "et la fin d'une séance, y compris lorsque celle-ci se poursuit après minuit. Le nombre de poses suit " +
-            "la règle demandée : une partie décimale inférieure à 0,5 arrondit à la pose inférieure, 0,5 et " +
-            "au-delà ajoute une pose. La fenêtre d'acquisition peut être remplie automatiquement à partir de la " +
-            "nuit astronomique calculée par N.I.N.A. pour votre profil d'observatoire. Le panneau et cette " +
-            "description suivent la langue de N.I.N.A. (français ou anglais, ou forcée par language=fr / " +
-            "language=en dans ExposureBudget.settings).";
+            "Exposure Budget calcule combien de poses tiennent entre une heure de début et une heure de fin, y " +
+            "compris pour les séances qui dépassent minuit — et, pour une caméra monochrome, comment répartir " +
+            "cette nuit entre les filtres." + Environment.NewLine + Environment.NewLine +
+            "FENÊTRE DE SÉANCE" + Environment.NewLine +
+            "Les heures de début et de fin se règlent au format 24 h avec des ascenseurs. Le panneau affiche la " +
+            "durée disponible, les dates exactes de la séance (pour qu'une séance qui finit le lendemain matin soit " +
+            "explicite) et un avertissement quand les deux heures sont identiques. Le bouton Nuit astronomique " +
+            "remplit les deux heures à partir du crépuscule et de l'aube calculés par N.I.N.A. pour votre profil " +
+            "d'observatoire, avec repli sur le crépuscule nautique, le crépuscule civil ou le coucher du Soleil " +
+            "lorsque le crépuscule astronomique n'existe pas à votre latitude. Le bouton Maintenant place le début " +
+            "à l'heure courante, pour voir ce qu'il reste à faire en pleine séance." + Environment.NewLine + Environment.NewLine +
+            "NOMBRE DE POSES" + Environment.NewLine +
+            "Une pose de n'importe quelle durée, réglée de 15 s en 15 s, avec son équivalent en minutes. Le calcul " +
+            "suit la règle demandée : une partie décimale inférieure à 0,5 arrondit à la pose inférieure, 0,5 et " +
+            "au-delà ajoute une pose. Le panneau affiche la valeur exacte, l'arrondi appliqué, le temps couvert, le " +
+            "reliquat et l'heure de fin de la dernière pose. Tout est recalculé à la frappe : il n'y a pas de bouton " +
+            "Calculer, et le nombre se copie dans le presse-papiers en un clic." + Environment.NewLine + Environment.NewLine +
+            "UNE NUIT RÉALISTE" + Environment.NewLine +
+            "Une surcharge par pose facultative (téléchargement, dither, stabilisation) fait coûter à chaque pose " +
+            "sa durée plus cette surcharge, et des temps à réserver facultatifs sont déduits de la fenêtre avant de " +
+            "compter : retournement au méridien, autofocus toutes les N poses et marge de sécurité. Le nombre " +
+            "annoncé est alors celui que vous atteindrez réellement." + Environment.NewLine + Environment.NewLine +
+            "CAMÉRA MONO ET FILTRES" + Environment.NewLine +
+            "L'onglet Plan par filtres partage la même fenêtre : une ligne par filtre avec une case à cocher, un " +
+            "temps de pose et un pourcentage du temps disponible. Chaque ligne affiche son propre nombre de poses, " +
+            "les totaux restent sous 100 %, et le plan est refusé quand les poses arrondies dépasseraient la " +
+            "fenêtre : un plan ne promet donc jamais plus que la nuit ne contient. Une ligne par filtre se copie " +
+            "facilement, prête à remplir une séquence." + Environment.NewLine + Environment.NewLine +
+            "RÉGLAGES ET LANGUE" + Environment.NewLine +
+            "Les derniers réglages (heures, temps de pose, surcharge, réserves et plan par filtres) sont mémorisés " +
+            "dans ExposureBudget.settings, un petit fichier texte à côté du plugin, modifiable à la main. Le panneau " +
+            "et cette description suivent la langue de N.I.N.A. : français ou anglais, forçable par language=fr ou " +
+            "language=en dans ce fichier.";
 
         public string EmptyCountDisplay => "–";
 
@@ -112,7 +227,7 @@ namespace NINA.Plugin.ExposureBudget.Localization {
 
         public string NightSun => "Coucher / lever du Soleil";
 
-        public string NightInfoFormat => "{0} du {1:dd/MM/yyyy} : {2:HH:mm} → {3:HH:mm} le {4:dd/MM/yyyy}.";
+        public string NightFallbackInfoFormat => "Pas de crépuscule astronomique cette nuit : repli sur {0}.";
 
         public string NightCalculatorUnavailableWarning => "Le calculateur de nuit de N.I.N.A. n'est pas disponible : saisissez les heures manuellement.";
 

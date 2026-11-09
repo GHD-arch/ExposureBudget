@@ -4,10 +4,10 @@ Récapitulatif complet de ce qui a été conçu, développé, vérifié et docum
 N.I.N.A. Document destiné à être lu seul : il reprend les décisions, les pièges rencontrés et
 les résultats des vérifications, sans avoir à parcourir l'historique du projet.
 
-- **Plugin** : Exposure Budget (ex-« Number To Hours »), version **1.2.1.0**
+- **Plugin** : Exposure Budget (ex-« Number To Hours »), version **1.5.3.0**
 - **Auteur** : Gerard Hurtaud
 - **Application cible** : N.I.N.A. 3.2.0.9001 installée (`net8.0-windows`), version minimale déclarée `3.0.0.0`
-- **Dossier de travail** : `E:\DEV\NTH - NumberToHours`
+- **Dossier de travail** : `E:\DEV\ExposureBudget`
 - **Installation** : `%LOCALAPPDATA%\NINA\Plugins\3.0.0\ExposureBudget\`
 
 ---
@@ -39,23 +39,47 @@ de la dernière pose**. Le calcul se fait **en direct** : il n'y a pas de bouton
 
 ## 2. Le panneau
 
+L'écran est organisé en un **bloc « Acquisition window »** (toujours visible) et **trois onglets**
+de calcul : *Pose unique*, *Plan par filtres* et *Temps à réserver*.
+
+**Bloc fenêtre d'acquisition** (il définit le delta d'heures, donc il appartient à aucun onglet) :
+
 - **Start / End** : ascenseurs `hh` (0–23) et `mm` (0–59) — contrôles **natifs** de N.I.N.A.
   (`IntStepperControl`), saisie clavier possible.
 - **Available duration** en direct, avec reconstitution de la séance
   (`10/10/2026 21:30 → 11/10/2026 03:15`) : le passage au lendemain est visible.
-- **Exposure** : `StepperControl` réglé **de 15 s en 15 s**, bornes 0,1 s → 24 h.
-- **Équivalence en minutes** à côté : `5 min 00 s` et `i.e. 5 min` (300 s = 5 min).
 - **Astronomical night (N.I.N.A.)** : remplit début et fin avec le **crépuscule et l'aube
   astronomiques** calculés par N.I.N.A. pour le profil d'observatoire actif — avec replis
   successifs **nautique → civil → coucher/lever du Soleil** si le crépuscule astronomique
-  n'existe pas (nuit blanche), et mention du repli utilisé.
-- **Number of exposures** en grand, avec détail, arrondi, couverture, reliquat et
-  avertissements (fenêtre nulle, temps de pose plus long que la fenêtre, dépassement de Hf).
+  n'existe pas (nuit blanche). Le message ne répète pas les horaires (déjà affichés deux lignes
+  au-dessus) : il ne signale qu'un **repli**.
 - **Now** : remplit l'heure de début avec l'heure courante (la date de référence passe au jour
   courant, pour qu'un clic en matinée ne place pas la séance la veille).
-- **Copy result** : copie **le nombre de poses** dans le presse-papiers (uniquement la valeur
-  affichée en grand) avec une confirmation ; un presse-papiers inaccessible est signalé dans le
-  panneau, jamais par une exception.
+- Ligne **« réservé · exploitable »** quand des temps à réserver sont saisis.
+
+**Onglet « Pose unique »** :
+
+- **Exposure** : `StepperControl` réglé **de 15 s en 15 s**, bornes 0,1 s → 24 h, avec
+  l'**équivalence en minutes** (`5 min 00 s` / `i.e. 5 min`).
+- **Overhead** (surcharge par pose) : `PrecisionStepperControl` pas de 1 s, 0 = désactivé, avec
+  le coût par pose affiché (`= 00:05:05 par pose`).
+- **Number of exposures** en grand, avec détail (fenêtre ÷ coût par pose), arrondi, couverture,
+  reliquat, **heure de fin de la dernière pose** et avertissements (fenêtre nulle, pose plus
+  longue que la fenêtre exploitable, dépassement, réserves supérieures à la fenêtre).
+- **Copy result** : copie **le nombre de poses** (uniquement la valeur) avec confirmation ;
+  un presse-papiers inaccessible est signalé, jamais par une exception.
+
+**Onglet « Plan par filtres »** (caméra mono) : une ligne par filtre — petite case à cocher
+(20 px, gabarit local : le style implicite de N.I.N.A. est un interrupteur de 65 px **qui
+n'affiche pas son contenu**), nom modifiable, temps de pose (pas de 5 s), pourcentage (pas de
+5 points), nombre de poses, et bouton **>** qui attribue les points de pourcentage restants.
+Boutons *Tout cocher*, *Répartir 100 %*, *Réinitialiser*, *+ filtre*, *- filtre*. Totaux,
+reliquat, message de **refus** (pourcentages > 100 % ou poses arrondies dépassant la fenêtre en
+temps consommé) et **Copier le plan** (une ligne par filtre), désactivé tant que le plan est
+refusé.
+
+**Onglet « Temps à réserver »** : retournement au méridien (min), autofocus toutes les N poses
+avec sa durée, marge fixe (min) ; résumé « réservé · exploitable ».
 
 ## 3. Architecture
 
@@ -64,10 +88,14 @@ NINA.Plugin.ExposureBudget\
   ExposureBudgetPlugin.cs            manifeste ([Export(typeof(IPluginManifest))] : PluginBase)
   DataTemplates.xaml(.cs)            dictionnaire exporté, clé « <VM>_Dockable »
   ViewModel\ExposureBudgetVM.cs      panneau ancrable ([Export(typeof(IDockableVM))] : DockableVM)
+  ViewModel\FilterPlanRowVM.cs       une ligne du plan par filtres (nom, pose, %, reliquat)
   View\ExposureBudgetView.xaml       interface (styles et contrôles N.I.N.A. d'origine)
   Localization\                      IPluginStrings + EnglishStrings + FrenchStrings + PluginLanguage
-  Model\ExposureBudgetCalculator.cs  logique de calcul pure (sans WPF, sans N.I.N.A.)
-  Model\ExposureCountResult.cs       résultat détaillé (exact, retenu, couvert, reliquat…)
+  Model\ExposureBudgetCalculator.cs  logique de calcul pure (fenêtre, surcharge, réserves, règle du 0,5)
+  Model\ExposureCountResult.cs       résultat détaillé (exact, retenu, couvert, consommé, reliquat…)
+  Model\NightReserves.cs             temps à réserver (flip, autofocus périodiques, marge)
+  Model\FilterPlanEntry.cs           un filtre du plan (nom, utilisé, pose, pourcentage)
+  Model\FilterPlanCalculator.cs      calcul du plan (allocation, arrondi, totaux, validations)
   Model\ExposureBudgetSettings.cs    réglages (fichier texte, sans dépendance)
   Resources\PluginImage.png          image du plugin (256 × 256, intégrée à l'assembly)
   Properties\AssemblyInfo.cs         nom, auteur, version, GUID, métadonnées du manifeste
@@ -75,9 +103,9 @@ tools\
   build.ps1                          construction + vérifications + installation
   install.ps1 / uninstall.ps1        installation / désinstallation (avec migration)
   makeicon\                          préparation et analyse d'images pour la fiche du plugin
-  verify\                            harnais de calcul (92 vérifications)
-  smoketest\                         harnais de chargement façon N.I.N.A. (157 vérifications)
-ExposureBudget.sln, README.md, digest.md
+  verify\                            harnais de calcul (154 vérifications)
+  smoketest\                         harnais de chargement façon N.I.N.A. (228 vérifications)
+ExposureBudget.sln, README.md, digest.md, afaire.md
 ```
 
 Le plugin s'appuie sur trois exports MEF, exactement comme le chargeur de N.I.N.A. les attend :
@@ -154,6 +182,17 @@ startMinute=30
 endHour=3
 endMinute=15
 exposureSeconds=300
+overheadSeconds=5
+flipReserveMinutes=10
+fixedReserveMinutes=5
+autofocusEvery=20
+autofocusDurationSeconds=30
+# filter plan : one block per filter, indexed by position.
+plan.filter.count=7
+plan.filter.0.name=L
+plan.filter.0.enabled=true
+plan.filter.0.exposure=120
+plan.filter.0.percent=40
 ```
 
 Lecture tolérante (clés inconnues ignorées, valeurs invalides ignorées, nombre accepté en
@@ -179,8 +218,8 @@ conservées.
 
 | Harnais | Portée | Résultat |
 |---|---|---|
-| `tools\verify` | logique de calcul pure : passage de minuit, durées, règle du 0,5, cas limites, bornes, refus des temps de pose invalides | **92 vérifications** |
-| `tools\smoketest` | chargement façon N.I.N.A. : composition **MEF réelle**, métadonnées et compatibilité, clé du `DataTemplate` dans `Application.Resources`, chargement de la vue depuis le BAML, **pose (layout) sans erreur**, **libellés effectivement affichés** dans le bon langage, liaisons des ascenseurs, recalcul en direct, bouton « Maintenant », contenu du texte copié et sa confirmation, avertissements, bouton *Nuit astronomique* et ses replis, réglages et migration, **fiche du plugin traduite par les deux chemins (appel C# et liaison WPF)**, **image chargée par le pack URI et affichée par la liaison** | **157 vérifications** |
+| `tools\verify` | logique de calcul pure : passage de minuit, durées, règle du 0,5, cas limites, bornes, refus des temps de pose invalides | **154 vérifications** |
+| `tools\smoketest` | chargement façon N.I.N.A. : composition **MEF réelle**, métadonnées et compatibilité, clé du `DataTemplate` dans `Application.Resources`, chargement de la vue depuis le BAML, **pose (layout) sans erreur**, **libellés effectivement affichés** dans le bon langage, liaisons des ascenseurs, recalcul en direct, bouton « Maintenant », contenu du texte copié et sa confirmation, avertissements, bouton *Nuit astronomique* et ses replis, réglages et migration, **fiche du plugin traduite par les deux chemins (appel C# et liaison WPF)**, **image chargée par le pack URI et affichée par la liaison** | **228 vérifications** |
 
 Ces harnais ont réellement trouvé des défauts pendant le développement : un écart de
 l'arrondi affiché au-delà de la fenêtre, la migration des réglages manquante, la fiche du
@@ -190,7 +229,7 @@ Ils tournent à chaque `build.ps1`.
 ## 10. Installation et utilisation
 
 ```powershell
-cd "E:\DEV\NTH - NumberToHours"
+cd "E:\DEV\ExposureBudget"
 
 .\tools\build.ps1 -Install     # construction + vérifications + installation
 .\tools\install.ps1            # installation seule (le dll doit être construit)
@@ -212,7 +251,7 @@ Le panneau apparaît dans le volet des outils de l'onglet **Imagerie**.
 |---|---|
 | Nom affiché | `Exposure Budget` |
 | Auteur | `Gerard Hurtaud` |
-| Version | **`1.2.1.0`** (quatre composants obligatoires) |
+| Version | **`1.5.3.0`** (quatre composants obligatoires) |
 | Version minimale de N.I.N.A. | `3.0.0.0` |
 | Identifiant (GUID) | `8F3A1C64-2D7E-4B91-A3F5-6C0D9E7B4A28` |
 | Licence | MPL-2.0 |
@@ -221,7 +260,7 @@ Le panneau apparaît dans le volet des outils de l'onglet **Imagerie**.
 Historique : **1.0.0.0** = première version fonctionnelle (« Number To Hours ») ;
 **1.1.0.0** = renommage, fiche du plugin traduite et corrigée, image du plugin, langue lue
 dans le profil, migration des réglages, journalisation ; **1.2.0.0** = confort (bouton
-« Maintenant », copie du résultat) ; **1.2.1.0** = la copie ne dépose que le nombre de poses.
+« Maintenant », copie du résultat) ; **1.2.1.0** = la copie ne dépose que le nombre de poses ; **1.3.0.0** = plan par filtres (caméra mono) ; **1.3.1.0** = correctif d'affichage des lignes de filtres.
 
 La version se met à jour à un seul endroit : `Properties\AssemblyInfo.cs`.
 
@@ -230,7 +269,7 @@ La version se met à jour à un seul endroit : `Properties\AssemblyInfo.cs`.
 Au démarrage, le plugin écrit deux lignes dans `%LOCALAPPDATA%\NINA\Logs\*.log` :
 
 ```
-ExposureBudget: panel language 'fr' (setting 'auto', N.I.N.A. language 'fr-FR'), plugin 1.2.1.0 loaded from ...
+ExposureBudget: panel language 'fr' (setting 'auto', N.I.N.A. language 'fr-FR'), plugin 1.5.3.0 loaded from ...
 ExposureBudget: plugin sheet language 'fr' (N.I.N.A. language 'fr-FR')
 ```
 
@@ -246,14 +285,16 @@ voici le résumé, classé par rapport valeur/effort.
 1. **Tableau comparatif des temps de pose** : afficher côte à côte, pour la fenêtre courante,
    120 s → 176 poses, 180 s → 117, 300 s → 70… avec le reliquat de chaque ligne. Transforme
    la calculette en outil de décision.
-2. **Surcharge par pose** (téléchargement, dither, stabilisation) : `pose + surcharge`. C'est
-   la première cause d'écart entre le calcul et la nuit réelle.
-3. **Temps à réserver** : flip au méridien, autofocus toutes les N poses, déduits de la fenêtre.
-4. **Élément de séquence « Exposure Budget »** : instruction qui calcule le nombre de poses à
+2. **Élément de séquence « Exposure Budget »** : instruction qui calcule le nombre de poses à
    l'exécution et alimente une prise de vues — planification dynamique par nuit et par cible.
-5. **Préremplissage depuis la séquence** (pose de la cible active) ou depuis la caméra.
-6. **Résultat exposé via le `SymbolBroker`**, réutilisable dans les expressions de séquence.
-7. **Option « ne jamais dépasser la fenêtre »** (plancher au lieu de l'arrondi au plus proche).
+3. **Préremplissage depuis la séquence** (pose de la cible active) ou depuis la caméra.
+4. **Résultat exposé via le `SymbolBroker`**, réutilisable dans les expressions de séquence.
+5. **Option « ne jamais dépasser la fenêtre »** (plancher au lieu de l'arrondi au plus proche) —
+   utile maintenant que la surcharge peut faire déborder la fenêtre de quelques secondes.
+6. **Diffusion et finitions** (dépôt de plugins, image 512 px, `-KeepSettings`).
+
+Déjà livrés depuis la première rédaction de cette liste : la **surcharge par pose**, les
+**temps à réserver** et le **plan par filtres** (voir [`afaire.md`](afaire.md), « Déjà réalisé »).
 8. **Confort** : bouton « Maintenant » pour le début, compte à rebours des poses restantes,
    copie du résultat, langues supplémentaires.
 9. **Diffusion** : dépôt GitHub, manifeste du dépôt de plugins N.I.N.A. (URL + empreinte),
@@ -271,7 +312,7 @@ voici le résumé, classé par rapport valeur/effort.
 | `NINA.Plugin.ExposureBudget\**` | le plugin (voir section 3) |
 | `tools\build.ps1` | construction, vérification, installation |
 | `tools\install.ps1` / `uninstall.ps1` | installation / désinstallation, avec migration depuis l'ancien nom |
-| `tools\verify\Program.cs` | harnais de calcul (92 vérifications) |
-| `tools\smoketest\Program.cs` + `Stubs.cs` | harnais de chargement (157 vérifications) |
+| `tools\verify\Program.cs` | harnais de calcul (154 vérifications) |
+| `tools\smoketest\Program.cs` + `Stubs.cs` | harnais de chargement (228 vérifications) |
 | `tools\makeicon\Program.cs` | préparation / analyse d'images, génération de l'icône calculatrice |
 | `image.png` | image source fournie par l'auteur (1024 × 1024) ; le plugin embarque la version préparée |

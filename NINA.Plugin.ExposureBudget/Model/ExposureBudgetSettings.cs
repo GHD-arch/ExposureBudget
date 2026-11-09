@@ -1,7 +1,9 @@
 using NINA.Core.Utility;
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 
 namespace NINA.Plugin.ExposureBudget.Model {
 
@@ -50,6 +52,45 @@ namespace NINA.Plugin.ExposureBudget.Model {
         public double ExposureSeconds { get; set; } = 300d;
 
         /// <summary>
+        /// Surcharge appliquée à chaque pose, en secondes : temps consommé par une pose en plus de
+        /// son exposition (téléchargement, dither, stabilisation). 0 = comportement d'origine.
+        /// </summary>
+        public double OverheadSeconds { get; set; }
+
+        /// <summary>Durée d'un retournement au méridien à réserver, en minutes.</summary>
+        public double FlipReserveMinutes { get; set; }
+
+        /// <summary>Marge fixe de sécurité à réserver, en minutes.</summary>
+        public double FixedReserveMinutes { get; set; }
+
+        /// <summary>Un autofocus toutes les N poses (0 = pas d'autofocus périodique).</summary>
+        public int AutofocusEvery { get; set; }
+
+        /// <summary>Durée d'un autofocus, en secondes.</summary>
+        public double AutofocusSeconds { get; set; }
+
+        /// <summary>
+        /// Plan par filtres : liste fixe mais editable (nom, filtre utilise, temps de pose et
+        /// pourcentage du temps disponible). Memorisee par position, pour qu'un renommage ne
+        /// fasse pas perdre les reglages.
+        /// </summary>
+        public List<FilterPlanEntry> FilterPlan { get; set; } = CreateDefaultFilterPlan();
+
+        /// <summary>
+        /// Plan propose au premier lancement : les sept filtres usuels d'une camera mono,
+        /// repartis sur 100 % (L 40 %, R/G/B 15 % chacun, S 5 %, H 7 %, O 3 %).
+        /// </summary>
+        public static List<FilterPlanEntry> CreateDefaultFilterPlan() => new List<FilterPlanEntry> {
+            new FilterPlanEntry("L", true, 120d, 40),
+            new FilterPlanEntry("R", true, 120d, 15),
+            new FilterPlanEntry("G", true, 120d, 15),
+            new FilterPlanEntry("B", true, 120d, 15),
+            new FilterPlanEntry("S", true, 300d, 5),
+            new FilterPlanEntry("H", true, 300d, 7),
+            new FilterPlanEntry("O", true, 300d, 3)
+        };
+
+        /// <summary>
         /// Chemin du fichier de reglages : dossier du plugin, avec repli sur
         /// %LOCALAPPDATA%\NINA\Plugins\ExposureBudget si ce dossier n'est pas accessible.
         /// </summary>
@@ -74,6 +115,11 @@ namespace NINA.Plugin.ExposureBudget.Model {
         public static ExposureBudgetSettings Load() {
             var settings = new ExposureBudgetSettings();
 
+            // Les entrees de filtre sont collectees par index pendant la lecture, puis
+            // materialisees a la fin : l'ordre des cles dans le fichier n'a pas d'importance.
+            var filters = new SortedDictionary<int, FilterPlanEntry>();
+            var filterCount = -1;
+
             try {
                 var path = SettingsFilePath;
                 if (!File.Exists(path)) { return settings; }
@@ -92,7 +138,16 @@ namespace NINA.Plugin.ExposureBudget.Model {
 
                     var key = line.Substring(0, separator).Trim();
                     var value = line.Substring(separator + 1).Trim();
+
+                    if (TryApplyFilterKey(key, value, filters, ref filterCount)) { continue; }
+
                     settings.Apply(key, value);
+                }
+
+                if (filterCount > 0 || filters.Count > 0) {
+                    // Une liste partielle est acceptee : les positions absentes gardent les
+                    // valeurs par defaut du meme index.
+                    settings.FilterPlan = BuildFilterPlan(filters, Math.Max(filterCount, filters.Count));
                 }
 
                 if (settings.SettingsVersion < CurrentSettingsVersion) {
@@ -106,6 +161,73 @@ namespace NINA.Plugin.ExposureBudget.Model {
             return settings;
         }
 
+        /// <summary>Reconnait les cles "plan.filter.N.champ" et "plan.filter.count".</summary>
+        private static bool TryApplyFilterKey(string key, string value, IDictionary<int, FilterPlanEntry> filters, ref int filterCount) {
+            const string prefix = "plan.filter.";
+            if (!key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) { return false; }
+
+            var rest = key.Substring(prefix.Length);
+            var dot = rest.IndexOf('.');
+            if (dot <= 0) { return false; }
+
+            var indexText = rest.Substring(0, dot);
+            var field = rest.Substring(dot + 1);
+
+            if (string.Equals(indexText, "count", StringComparison.OrdinalIgnoreCase)) {
+                if (TryParseInt(value, out var count)) { filterCount = count; }
+                return true;
+            }
+
+            if (!int.TryParse(indexText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var index) || index < 0 || index > 63) {
+                return true;
+            }
+
+            if (!filters.TryGetValue(index, out var entry)) {
+                var defaults = CreateDefaultFilterPlan();
+                entry = index < defaults.Count ? defaults[index] : new FilterPlanEntry();
+                filters[index] = entry;
+            }
+
+            switch (field.ToLowerInvariant()) {
+                case "name":
+                    entry.Name = value;
+                    break;
+
+                case "enabled":
+                    entry.Enabled = !string.Equals(value, "false", StringComparison.OrdinalIgnoreCase) && value != "0";
+                    break;
+
+                case "exposure":
+                    if (TryParseDouble(value, out var exposure)) { entry.ExposureSeconds = exposure; }
+                    break;
+
+                case "percent":
+                    if (TryParseInt(value, out var percent)) { entry.Percent = Math.Clamp(percent, 0, 100); }
+                    break;
+
+                default:
+                    break;
+            }
+
+            return true;
+        }
+
+        /// <summary>Construit la liste finale a partir des index lus, dans l'ordre.</summary>
+        private static List<FilterPlanEntry> BuildFilterPlan(IDictionary<int, FilterPlanEntry> filters, int count) {
+            var defaults = CreateDefaultFilterPlan();
+            var plan = new List<FilterPlanEntry>(count);
+
+            for (var i = 0; i < count; i++) {
+                if (filters.TryGetValue(i, out var entry) && !string.IsNullOrWhiteSpace(entry.Name)) {
+                    plan.Add(entry);
+                } else if (i < defaults.Count) {
+                    plan.Add(defaults[i]);
+                }
+            }
+
+            return plan.Count > 0 ? plan : CreateDefaultFilterPlan();
+        }
+
         public void Save() {
             try {
                 var path = SettingsFilePath;
@@ -114,7 +236,7 @@ namespace NINA.Plugin.ExposureBudget.Model {
                     Directory.CreateDirectory(folder);
                 }
 
-                var lines = new[] {
+                var lines = new List<string> {
                     "# Exposure Budget - plugin settings, editable by hand.",
                     "# language : auto (default, follows the N.I.N.A. user interface language), en, or fr.",
                     "# The window times use the 24 hour clock, the exposure time is in seconds.",
@@ -124,8 +246,24 @@ namespace NINA.Plugin.ExposureBudget.Model {
                     "startMinute=" + StartMinute.ToString(CultureInfo.InvariantCulture),
                     "endHour=" + EndHour.ToString(CultureInfo.InvariantCulture),
                     "endMinute=" + EndMinute.ToString(CultureInfo.InvariantCulture),
-                    "exposureSeconds=" + ExposureSeconds.ToString("0.###", CultureInfo.InvariantCulture)
+                    "exposureSeconds=" + ExposureSeconds.ToString("0.###", CultureInfo.InvariantCulture),
+                    "overheadSeconds=" + OverheadSeconds.ToString("0.###", CultureInfo.InvariantCulture),
+                    "flipReserveMinutes=" + FlipReserveMinutes.ToString("0.###", CultureInfo.InvariantCulture),
+                    "fixedReserveMinutes=" + FixedReserveMinutes.ToString("0.###", CultureInfo.InvariantCulture),
+                    "autofocusEvery=" + AutofocusEvery.ToString(CultureInfo.InvariantCulture),
+                    "autofocusDurationSeconds=" + AutofocusSeconds.ToString("0.###", CultureInfo.InvariantCulture),
+                    "# filter plan : one block per filter, indexed by position.",
+                    "plan.filter.count=" + FilterPlan.Count.ToString(CultureInfo.InvariantCulture)
                 };
+
+                for (var i = 0; i < FilterPlan.Count; i++) {
+                    var filter = FilterPlan[i];
+                    var prefix = "plan.filter." + i.ToString(CultureInfo.InvariantCulture) + ".";
+                    lines.Add(prefix + "name=" + (filter.Name ?? string.Empty).Trim());
+                    lines.Add(prefix + "enabled=" + (filter.Enabled ? "true" : "false"));
+                    lines.Add(prefix + "exposure=" + filter.ExposureSeconds.ToString("0.###", CultureInfo.InvariantCulture));
+                    lines.Add(prefix + "percent=" + filter.Percent.ToString(CultureInfo.InvariantCulture));
+                }
 
                 File.WriteAllLines(path, lines, new System.Text.UTF8Encoding(false));
             } catch (Exception ex) {
@@ -161,6 +299,26 @@ namespace NINA.Plugin.ExposureBudget.Model {
 
                 case "exposureseconds":
                     if (TryParseDouble(value, out var exposureSeconds)) { ExposureSeconds = exposureSeconds; }
+                    break;
+
+                case "overheadseconds":
+                    if (TryParseDouble(value, out var overhead)) { OverheadSeconds = Math.Max(0d, overhead); }
+                    break;
+
+                case "flipreserveminutes":
+                    if (TryParseDouble(value, out var flip)) { FlipReserveMinutes = Math.Max(0d, flip); }
+                    break;
+
+                case "fixedreserveminutes":
+                    if (TryParseDouble(value, out var fixedMargin)) { FixedReserveMinutes = Math.Max(0d, fixedMargin); }
+                    break;
+
+                case "autofocusevery":
+                    if (TryParseInt(value, out var autofocusEvery)) { AutofocusEvery = Math.Max(0, autofocusEvery); }
+                    break;
+
+                case "autofocusdurationseconds":
+                    if (TryParseDouble(value, out var autofocusSeconds)) { AutofocusSeconds = Math.Max(0d, autofocusSeconds); }
                     break;
 
                 default:

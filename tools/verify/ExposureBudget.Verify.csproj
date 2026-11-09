@@ -18,6 +18,9 @@
     <Compile Include="Program.cs" />
     <Compile Include="..\..\NINA.Plugin.ExposureBudget\Model\ExposureBudgetCalculator.cs" Link="Model\ExposureBudgetCalculator.cs" />
     <Compile Include="..\..\NINA.Plugin.ExposureBudget\Model\ExposureCountResult.cs" Link="Model\ExposureCountResult.cs" />
+    <Compile Include="..\..\NINA.Plugin.ExposureBudget\Model\FilterPlanEntry.cs" Link="Model\FilterPlanEntry.cs" />
+    <Compile Include="..\..\NINA.Plugin.ExposureBudget\Model\FilterPlanCalculator.cs" Link="Model\FilterPlanCalculator.cs" />
+    <Compile Include="..\..\NINA.Plugin.ExposureBudget\Model\NightReserves.cs" Link="Model\NightReserves.cs" />
   </ItemGroup>
 
 </Project>

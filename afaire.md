@@ -20,12 +20,12 @@ Le détail (mise en œuvre, vérifications, décisions) suit dans les sections n
 - [ ] **1. Tableau comparatif des temps de pose** — affiche, pour la nuit saisie, ce que
   donneraient plusieurs durées d'exposition (120 s → 176 poses, 180 s → 117, 300 s → 70…).
   On choisit sa durée d'après le nombre de poses visé, au lieu de tâtonner. *(priorité 1 · effort faible · apport très élevé)*
-- [ ] **2. Surcharge par pose** — ajoute à chaque pose le temps qu'elle consomme réellement en
+- [x] **2. Surcharge par pose** — ajoute à chaque pose le temps qu'elle consomme réellement en
   plus (téléchargement, dither, stabilisation : souvent 2 à 8 s). Le calcul cesse de surestimer
-  la nuit de 5 à 10 %. *(priorité 1 · effort faible · apport très élevé)*
-- [ ] **3. Temps à réserver** — déduit de la fenêtre les opérations inévitables : flip au
+  la nuit de 5 à 10 %. *(priorité 1 · effort faible · apport très élevé · **fait en 1.5.0.0**)*
+- [x] **3. Temps à réserver** — déduit de la fenêtre les opérations inévitables : flip au
   méridien, autofocus toutes les N poses, marge fixe. Le nombre annoncé tient compte de ce qui
-  ne prendra pas de poses. *(priorité 2 · effort moyen · apport élevé)*
+  ne prendra pas de poses. *(priorité 2 · effort moyen · apport élevé · **fait en 1.5.0.0**)*
 - [ ] **4. Élément de séquence « Exposure Budget »** — une instruction dans le séquenceur qui
   calcule le nombre de poses à l'exécution (nuit et cible en cours) et alimente la prise de
   vues. Plus besoin de saisir un nombre à la main avant chaque nuit. *(priorité 2 · effort élevé · apport très élevé)*
@@ -47,6 +47,11 @@ Le détail (mise en œuvre, vérifications, décisions) suit dans les sections n
 - [ ] **10. Finitions** — image en 512 px pour les écrans à forte densité, variante transparente
   si vous fournissez un PNG avec canal alpha, option de sauvegarde des réglages à la
   désinstallation. *(priorité 5 · effort faible · apport faible)*
+- [x] **11. Plan par filtres (caméra mono)** — un second onglet où l'on coche les filtres à
+  utiliser (L, R, G, B, S, H, O), avec pour chacun un temps de pose et un **pourcentage de la
+  nuit** ; le plugin donne le nombre de poses par filtre et **refuse** le plan si le total des
+  poses arrondies dépasse la fenêtre. *(priorité 1 · **fait en 1.4.0.0**, les trois lots)
+  reste le lot 3 : copier le plan, attribuer le reliquat, gérer la liste des filtres)*
 
 ---
 
@@ -339,6 +344,122 @@ du texte copié, confirmation affichée puis effacée au calcul suivant, libell�
 
 ---
 
+## 11. Plan par filtres (caméra mono)
+
+> **État : fait (version 1.4.0.0).** Les trois lots sont réalisés. Reste à intégrer la surcharge
+> et les réserves dans le plan quand les tâches 2 et 3 seront faites.
+> Origine : caméra mono, filtres L/R/G/B/S/H/O, un temps de pose et un pourcentage du temps
+> disponible par filtre, avec vérification que le total tient dans la nuit.
+
+**En une phrase** : un second onglet du panneau où l'on coche les filtres à utiliser, règle pour
+chacun un temps de pose et un pourcentage de la nuit, et où le plugin donne le nombre de poses par
+filtre en vérifiant que le total ne dépasse pas la fenêtre.
+
+### 11.1 Décisions validées
+
+| # | Sujet | Décision |
+|---|---|---|
+| 1 | Pourcentages | **entiers, pas de 5** |
+| 2 | Σ % < 100 | **bouton « Attribuer le reliquat »** : les points de pourcentage non utilisés vont au filtre sélectionné |
+| 3 | Dépassement dû aux arrondis | **refus** : aucun arbitrage automatique, le plan est déclaré invalide avec le dépassement chiffré |
+| 4 | Arrondi par filtre | **règle du 0,5**, identique au calcul simple |
+| 5 | Structure de l'interface | **deux onglets** : « Pose unique » (existant) et « Plan par filtres » |
+| 6 | Liste des filtres | **liste fixe éditable** (pas de roue à filtres aujourd'hui) : noms modifiables, ajout et suppression de lignes |
+
+### 11.2 Calcul, pour chaque filtre coché
+
+| Étape | Formule |
+|---|---|
+| Temps alloué | `A = ΔT × p / 100` |
+| Nombre exact | `N = A / s` |
+| Nombre retenu | `C = règle du 0,5` (même code que l'onglet principal) |
+| Temps couvert | `T = C × s` |
+
+**Vérification bloquante** : `Σ T ≤ ΔT` ; sinon le plan est **refusé** avec un message chiffré
+(« les poses arrondies dépassent la fenêtre de 00:00:40 — réduisez un pourcentage ou un temps de
+pose »). Contrôle de saisie complémentaire : `Σ p ≤ 100 %`.
+
+Exemple (ΔT = 4 h) : L 40 % / 120 s → 48 poses (1 h 36) ; R, G, B 15 % / 120 s → 18 poses chacun
+(36 min) ; S 5 % / 300 s → 2 poses ; H 7 % / 300 s → 3 poses ; O 3 % / 300 s → 1 pose. Total :
+108 poses, 3 h 54 couvertes, **6 min perdues** par les arrondis (2,40 → 2 et 1,44 → 1) : elles
+sont affichées mais non redistribuables avec des pourcentages entiers.
+
+### 11.3 Mise en page
+
+Le bloc « fenêtre d'acquisition » (existant) reste en haut, toujours visible ; dessous, deux
+onglets. Contenu de l'onglet « Plan par filtres » :
+
+```
+[Tout cocher]  [Répartir 100 %]  [Réinitialiser]
+┌───┬──────────┬──────────────┬──────────┬───────┐
+│ ✓ │ Filtre   │ Pose (s)     │    %     │ Poses │
+├───┼──────────┼──────────────┼──────────┼───────┤
+│[x]│ L        │ [−][120][+]  │[−][40][+]│  48   │
+│[x]│ R        │ [−][120][+]  │[−][15][+]│  18   │
+│[x]│ G        │ [−][120][+]  │[−][15][+]│  18   │
+│[x]│ B        │ [−][120][+]  │[−][15][+]│  18   │
+│[x]│ S        │ [−][300][+]  │[−][ 5][+]│   2   │
+│[x]│ H        │ [−][300][+]  │[−][ 7][+]│   3   │
+│[ ]│ O        │ [−][300][+]  │[−][ 3][+]│   –   │
+└───┴──────────┴──────────────┴──────────┴───────┘
+[+ filtre]  [− filtre]
+Σ % : 100 %   ·   108 poses   ·   3 h 54 min
+Reste : 6 min                        [Attribuer le reliquat au filtre sélectionné]
+                                     [Copier le plan]
+```
+
+- % et temps de pose par **ascenseurs** natifs (0–100 pas de 5 ; pose pas de 15 s avec saisie
+  libre) ; le nom du filtre est un **champ éditable** (liste fixe), avec `[+ filtre]` / `[− filtre]` ;
+- la ligne **Σ** est la zone de validation : rouge si `Σ % > 100 %`, rouge si le temps couvert
+  dépasse la fenêtre (refus, bouton de copie désactivé), reliquat toujours affiché ;
+- messages **écrits**, pas seulement colorés ;
+- un filtre décoché affiche « – » et sort de tous les calculs (ses valeurs restent mémorisées) ;
+- « Répartir 100 % » répartit les points entiers entre les filtres cochés (le reste au premier) ;
+- « Attribuer le reliquat » donne les points non utilisés (100 − Σ %) au filtre sélectionné ;
+- « Copier le plan » copie une ligne par filtre (`L : 48 × 120 s (1 h 36 min)`), dans l'esprit du
+  bouton de copie actuel (qui ne copie que le nombre).
+
+### 11.4 Persistance (liste fixe, indexée)
+
+```
+plan.filter.count=7
+plan.filter.0.name=L
+plan.filter.0.enabled=true
+plan.filter.0.exposure=120
+plan.filter.0.percent=40
+...
+plan.rounding=half-up
+```
+
+Indexation par **position** et non par nom, pour qu'un renommage ne perde pas les réglages ;
+`settingsVersion` incrémenté (les fichiers existants prennent les valeurs par défaut).
+
+### 11.5 Architecture
+
+- `Model\FilterPlanEntry.cs` + `Model\FilterPlanCalculator.cs` → `FilterPlanResult` (lignes,
+  totaux, validations) : **pur, sans WPF ni N.I.N.A.**, testé dans `tools\verify` ;
+- `ViewModel\FilterPlanRowVM.cs` (une ligne notifiante) + extension de `ExposureBudgetVM`
+  (liste, totaux, commandes) ; recalcul branché au même endroit que le reste, donc les boutons
+  **Now** et **Nuit** profitent immédiatement au plan ;
+- `View\ExposureBudgetView.xaml` : `TabControl` (styles natifs disponibles) + onglet filtres ;
+- ~12 chaînes dans `Localization\` (anglais/français), messages de validation compris ;
+- **critère d'architecture** : un filtre unique à 100 % doit donner exactement le même nombre que
+  l'onglet « Pose unique » (même `ExposureBudgetCalculator`, une seule source de vérité).
+
+### 11.6 Lots
+
+| Lot | Contenu | Effort | État |
+|---|---|---|---|
+| 1 | modèle pur, calcul par filtre, totaux, validations, onglet avec liste fixe | ~½ journée | **fait** (1.3.0.0) |
+| 2 | édition (cases, ascenseurs de pose et de %), boutons, validations visibles, persistance | ~1 journée | **fait** (1.3.0.0) |
+| 3 | « Copier le plan », « Attribuer le reliquat », renommer / ajouter / supprimer des filtres | ~½ journée | **fait** (1.4.0.0) |
+
+Effort total ≈ 2 journées. Risque principal : densité de l'interface dans un panneau étroit
+(atténué par les onglets et les ascenseurs) ; risque secondaire : le cas « refus » doit être
+impossible à manquer.
+
+---
+
 ## Décisions à prendre
 
 | Sujet | Question | Recommandation |
@@ -351,6 +472,35 @@ du texte copié, confirmation affichée puis effacée au calcul suivant, libell�
 
 ## Déjà réalisé
 
+- **1.5.0.0** — **réalisme du calcul** : **surcharge par pose** (temps consommé = exposition +
+  surcharge, réglée de 1 s en 1 s, appliquée aussi au plan par filtres) et **temps à réserver**
+  (retournement au méridien, autofocus toutes les N poses avec itération, marge fixe) déduits de
+  la fenêtre, avec nouvel onglet « Temps à réserver », résumé « réservé · exploitable » et
+  avertissement quand les réserves dépassent la fenêtre. 24 vérifications pures et 16 vérifications
+  d'interface ajoutées.
+
+- **1.4.0.0** — **plan par filtres, lot 3** : bouton **>** par ligne (attribue les points de
+  pourcentage non utilisés au filtre), **nom de filtre modifiable** dans la ligne, **+ filtre** /
+  **- filtre**, et **Copier le plan** (une ligne par filtre + totaux), désactivé tant que le plan
+  est refusé. Quatorze vérifications ajoutées (reliquat, copie, renommage, ajout, suppression,
+  copie bloquée sur plan refusé).
+- **1.3.2.0** — onglet « Plan par filtres » lisible : les **noms des filtres** s'affichent de
+  nouveau (le style implicite de N.I.N.A. est un interrupteur de 65 px qui n'affiche pas son
+  contenu → **petite case à cocher de 20 px définie par le plugin**, nom dans sa propre colonne),
+  colonnes 22 / 44 / 92 / 84 / reste, et **temps de pose réglé de 5 s en 5 s** dans le plan
+  (l'onglet principal garde 15 s). Le harnais vérifie les noms affichés, la taille des cases, le
+  pas de 5 s et l'absence de chevauchement.
+- **1.3.1.0** — correctif d'affichage de l'onglet « Plan par filtres » : la case à cocher de
+  N.I.N.A. mesure 65 × 25 px (style `StandardCheckBox`) et le nom du filtre se superposait à
+  elle. Le nom est désormais **dans** la case à cocher (un seul contrôle, chevauchement
+  impossible), colonnes rééquilibrées (74 / 92 / 84 / reste) et **contrôle automatique** ajouté
+  au harnais : les éléments d'une ligne de filtre ne doivent pas se chevaucher.
+- **1.3.0.0** — **plan par filtres** (lots 1 et 2) : second onglet « Plan par filtres », sept
+  filtres par défaut (L, R, G, B, S, H, O), cases à cocher, temps de pose et pourcentages
+  éditables, nombre de poses par filtre, totaux et reliquat, **refus** si `Σ % > 100 %` ou si les
+  poses arrondies dépassent la fenêtre, boutons *Tout cocher* / *Répartir 100 %* / *Réinitialiser*,
+  plan mémorisé dans les réglages. Logique pure testée (`FilterPlanCalculator`) et interface
+  vérifiée (onglet, sept lignes, validations).
 - **1.2.0.0 / 1.2.1.0** — confort : bouton **« Maintenant »** (heure de début = heure courante,
   date du jour) et bouton **« Copier le résultat »** (le **nombre de poses** dans le
   presse-papiers, avec confirmation). Vérifications ajoutées aux deux harnais.

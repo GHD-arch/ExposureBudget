@@ -20,6 +20,12 @@ namespace NINA.Plugin.ExposureBudget.Model {
         /// <summary>Temps de pose maximal accepte (24 h, en secondes).</summary>
         public const double MaxExposureSeconds = 86400d;
 
+        /// <summary>Surcharge maximale acceptee par pose (1 h, en secondes).</summary>
+        public const double MaxOverheadSeconds = 3600d;
+
+        /// <summary>Pas de reglage de la surcharge par pose (en secondes).</summary>
+        public const int OverheadStepSeconds = 1;
+
         /// <summary>
         /// Duree disponible entre Hd et Hf.
         /// Si Hf est anterieure ou egale a Hd, la fin est comprise comme appartenant
@@ -52,22 +58,78 @@ namespace NINA.Plugin.ExposureBudget.Model {
         /// </summary>
         /// <exception cref="ArgumentOutOfRangeException">Si le temps de pose n'est pas strictement positif.</exception>
         public static ExposureCountResult Compute(TimeSpan window, double exposureSeconds) {
+            return Compute(window, exposureSeconds, 0d, null);
+        }
+
+        /// <summary>
+        /// Calcule le nombre de poses en tenant compte de la **surcharge par pose** (le temps que
+        /// consomme une pose en plus de son temps d'exposition : telechargement, dither,
+        /// stabilisation) et des **temps a reserver** (retournement, autofocus, marge).
+        ///
+        /// Le temps consomme par une pose est <c>exposure + overhead</c> ; le temps couvert
+        /// (somme des temps d'exposition) reste <c>count × exposure</c>. Les autofocus dependant
+        /// du nombre de poses, le calcul itere jusqu'a coherence.
+        /// </summary>
+        /// <exception cref="ArgumentOutOfRangeException">Si le temps de pose n'est pas strictement positif.</exception>
+        public static ExposureCountResult Compute(TimeSpan window, double exposureSeconds, double overheadSeconds, NightReserves reserves) {
             if (double.IsNaN(exposureSeconds) || double.IsInfinity(exposureSeconds) || exposureSeconds <= 0d) {
                 throw new ArgumentOutOfRangeException(nameof(exposureSeconds), exposureSeconds,
                     "Le temps de pose doit etre strictement superieur a 0 seconde.");
             }
 
+            var overhead = Clamp(overheadSeconds, 0d, MaxOverheadSeconds);
+            var nightReserves = reserves ?? new NightReserves();
+
+            if (window <= TimeSpan.Zero) {
+                return ComputeCore(TimeSpan.Zero, TimeSpan.Zero, exposureSeconds, overhead, TimeSpan.Zero, false);
+            }
+
+            // Iteration : le temps reserve depend du nombre de poses (autofocus), qui depend du
+            // temps reserve. On part sans autofocus, puis on converge en quelques tours.
+            var reserved = nightReserves.Total(0);
+            ExposureCountResult result = null;
+
+            for (var iteration = 0; iteration < 8; iteration++) {
+                var usable = window - reserved;
+                var reservesExceed = usable < TimeSpan.Zero;
+                if (reservesExceed) { usable = TimeSpan.Zero; }
+
+                result = ComputeCore(window, usable, exposureSeconds, overhead, reserved, reservesExceed);
+
+                var nextReserved = nightReserves.Total(result.Count);
+                if (nextReserved == reserved) {
+                    return result;
+                }
+
+                reserved = nextReserved;
+            }
+
+            // Non convergé (cas pathologique) : le dernier resultat reste coherent avec le temps
+            // reserve qu'il a utilise.
+            return result;
+        }
+
+        /// <summary>Coeur du calcul : une fenetre exploitable, une pose et sa surcharge.</summary>
+        private static ExposureCountResult ComputeCore(TimeSpan window, TimeSpan usableWindow, double exposureSeconds, double overheadSeconds, TimeSpan reserved, bool reservesExceed) {
             var exposure = (decimal)exposureSeconds;
-            var windowSeconds = (decimal)window.TotalSeconds;
-            var exactCount = windowSeconds / exposure;
+            var overhead = (decimal)overheadSeconds;
+            var perPose = exposure + overhead;
+            var windowSeconds = (decimal)usableWindow.TotalSeconds;
+            var exactCount = perPose > 0m ? windowSeconds / perPose : 0m;
             var count = RoundToPoseCount(exactCount);
 
             return new ExposureCountResult {
                 Window = window,
+                UsableWindow = usableWindow,
+                ReservedSeconds = reserved,
+                ReservesExceedWindow = reservesExceed,
                 ExposureSeconds = exposureSeconds,
+                OverheadSeconds = overheadSeconds,
+                PerPoseSeconds = perPose,
                 ExactCount = exactCount,
                 Count = count,
-                CoveredSeconds = exposure * count
+                CoveredSeconds = exposure * count,
+                ConsumedSeconds = perPose * count
             };
         }
 

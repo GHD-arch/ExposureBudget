@@ -9,8 +9,10 @@ using NINA.Profile.Interfaces;
 using NINA.WPF.Base.ViewModel;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.ComponentModel.Composition;
 using System.Globalization;
+using System.Linq;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -63,13 +65,32 @@ namespace NINA.Plugin.ExposureBudget.ViewModel {
                 settings.ExposureSeconds,
                 ExposureBudgetCalculator.MinExposureSeconds,
                 ExposureBudgetCalculator.MaxExposureSeconds);
+            overheadSeconds = ExposureBudgetCalculator.Clamp(
+                settings.OverheadSeconds, 0d, ExposureBudgetCalculator.MaxOverheadSeconds);
+            flipReserveMinutes = Math.Max(0d, settings.FlipReserveMinutes);
+            fixedReserveMinutes = Math.Max(0d, settings.FixedReserveMinutes);
+            autofocusEvery = Math.Max(0, settings.AutofocusEvery);
+            autofocusSeconds = Math.Max(0d, settings.AutofocusSeconds);
 
             UseNightTimesCommand = new MvvmCommand(UseNightTimes);
             SetStartToNowCommand = new MvvmCommand(() => SetStartToNow());
             CopyResultCommand = new MvvmCommand(() => CopyResult());
+            CheckAllFiltersCommand = new MvvmCommand(() => CheckAllFilters());
+            DistributeFiltersCommand = new MvvmCommand(() => DistributeFilters());
+            ResetFilterPlanCommand = new MvvmCommand(() => ResetFilterPlan());
+            CopyFilterPlanCommand = new MvvmCommand(() => CopyFilterPlan());
+            AddFilterCommand = new MvvmCommand(() => AddFilter());
+            RemoveLastFilterCommand = new MvvmCommand(() => RemoveLastFilter());
 
+            BuildFilterPlanRows();
             Recalculate();
         }
+
+        /// <summary>
+        /// Lignes du plan par filtres. La liste est fixe mais éditable : elle vient des réglages
+        /// (sept filtres usuels au premier lancement) et chaque modification est mémorisée.
+        /// </summary>
+        public ObservableCollection<FilterPlanRowVM> FilterPlan { get; } = new ObservableCollection<FilterPlanRowVM>();
 
         /// <summary>
         /// Chaînes de l'interface, liées par la vue (libellés, infobulles, messages).
@@ -92,6 +113,24 @@ namespace NINA.Plugin.ExposureBudget.ViewModel {
 
         /// <summary>Copie tout le calcul dans le presse-papiers.</summary>
         public ICommand CopyResultCommand { get; }
+
+        /// <summary>Coche tous les filtres du plan.</summary>
+        public ICommand CheckAllFiltersCommand { get; }
+
+        /// <summary>Répartit 100 % entre les filtres cochés, par pas de 5 points.</summary>
+        public ICommand DistributeFiltersCommand { get; }
+
+        /// <summary>Remet le plan par filtres à ses valeurs par défaut.</summary>
+        public ICommand ResetFilterPlanCommand { get; }
+
+        /// <summary>Copie le plan par filtres (une ligne par filtre) dans le presse-papiers.</summary>
+        public ICommand CopyFilterPlanCommand { get; }
+
+        /// <summary>Ajoute un filtre en fin de liste.</summary>
+        public ICommand AddFilterCommand { get; }
+
+        /// <summary>Supprime le dernier filtre de la liste.</summary>
+        public ICommand RemoveLastFilterCommand { get; }
 
         #region Saisie : fenêtre d'acquisition
 
@@ -205,6 +244,117 @@ namespace NINA.Plugin.ExposureBudget.ViewModel {
 
         #endregion Saisie : temps de pose
 
+        #region Saisie : surcharge et réserves
+
+        private double overheadSeconds;
+
+        /// <summary>
+        /// Surcharge appliquée à chaque pose, en secondes : temps réellement consommé par une pose
+        /// en plus de son exposition (téléchargement, dither, stabilisation). 0 = désactivé.
+        /// </summary>
+        public double ExposureOverheadSeconds {
+            get => overheadSeconds;
+            set {
+                var clamped = ExposureBudgetCalculator.Clamp(value, 0d, ExposureBudgetCalculator.MaxOverheadSeconds);
+                if (Math.Abs(clamped - overheadSeconds) < 1e-9) { return; }
+                overheadSeconds = clamped;
+                RaisePropertyChanged();
+                RaisePropertyChanged(nameof(OverheadInfoText));
+                RaisePropertyChanged(nameof(HasOverhead));
+                Recalculate();
+            }
+        }
+
+        public bool HasOverhead => overheadSeconds > 0d;
+
+        /// <summary>Information affichée à côté du champ de surcharge (temps consommé par pose).</summary>
+        public string OverheadInfoText => overheadSeconds > 0d
+            ? string.Format(strings.Culture, strings.OverheadInfoFormat,
+                FormatDuration(TimeSpan.FromSeconds(exposureSeconds + overheadSeconds)))
+            : string.Empty;
+
+        /// <summary>Pas de réglage de la surcharge (1 s).</summary>
+        public double OverheadStepSeconds => ExposureBudgetCalculator.OverheadStepSeconds;
+
+        public double MaxOverheadSeconds => ExposureBudgetCalculator.MaxOverheadSeconds;
+
+        private double flipReserveMinutes;
+
+        /// <summary>Retournement au méridien à réserver, en minutes.</summary>
+        public double FlipReserveMinutes {
+            get => flipReserveMinutes;
+            set {
+                var clamped = Math.Max(0d, Math.Min(value, 600d));
+                if (Math.Abs(clamped - flipReserveMinutes) < 1e-9) { return; }
+                flipReserveMinutes = clamped;
+                RaisePropertyChanged();
+                Recalculate();
+            }
+        }
+
+        private double fixedReserveMinutes;
+
+        /// <summary>Marge fixe de sécurité à réserver, en minutes.</summary>
+        public double FixedReserveMinutes {
+            get => fixedReserveMinutes;
+            set {
+                var clamped = Math.Max(0d, Math.Min(value, 600d));
+                if (Math.Abs(clamped - fixedReserveMinutes) < 1e-9) { return; }
+                fixedReserveMinutes = clamped;
+                RaisePropertyChanged();
+                Recalculate();
+            }
+        }
+
+        private int autofocusEvery;
+
+        /// <summary>Un autofocus toutes les N poses (0 = pas d'autofocus périodique).</summary>
+        public int AutofocusEvery {
+            get => autofocusEvery;
+            set {
+                var clamped = Math.Max(0, Math.Min(value, 1000));
+                if (clamped == autofocusEvery) { return; }
+                autofocusEvery = clamped;
+                RaisePropertyChanged();
+                Recalculate();
+            }
+        }
+
+        private double autofocusSeconds;
+
+        /// <summary>Durée d'un autofocus, en secondes.</summary>
+        public double AutofocusDurationSeconds {
+            get => autofocusSeconds;
+            set {
+                var clamped = Math.Max(0d, Math.Min(value, 3600d));
+                if (Math.Abs(clamped - autofocusSeconds) < 1e-9) { return; }
+                autofocusSeconds = clamped;
+                RaisePropertyChanged();
+                Recalculate();
+            }
+        }
+
+        /// <summary>Vrai si au moins une réserve est saisie.</summary>
+        public bool HasReserves => !BuildNightReserves().IsEmpty;
+
+        private string reservesSummaryText = string.Empty;
+
+        /// <summary>Résumé « réservé · exploitable » affiché dans l'onglet des réserves.</summary>
+        public string ReservesSummaryText {
+            get => reservesSummaryText;
+            private set { reservesSummaryText = value; RaisePropertyChanged(); }
+        }
+
+        /// <summary>Temps réservé pour un nombre de poses donné (utilisé par le résumé).</summary>
+        private NightReserves BuildNightReserves() => new NightReserves {
+            FlipMinutes = flipReserveMinutes,
+            FixedMinutes = fixedReserveMinutes,
+            AutofocusEvery = autofocusEvery,
+            AutofocusSeconds = autofocusSeconds
+        };
+
+        #endregion Saisie : surcharge et réserves
+
         #region Résultats
 
         private string windowText = string.Empty;
@@ -298,8 +448,15 @@ namespace NINA.Plugin.ExposureBudget.ViewModel {
         /// <summary>Information sur la nuit astronomique récupérée depuis N.I.N.A.</summary>
         public string NightInfoText {
             get => nightInfoText;
-            private set { nightInfoText = value; RaisePropertyChanged(); }
+            private set {
+                nightInfoText = value;
+                RaisePropertyChanged();
+                RaisePropertyChanged(nameof(HasNightInfo));
+            }
         }
+
+        /// <summary>Vrai quand le bouton de nuit a quelque chose a signaler (repli).</summary>
+        public bool HasNightInfo => !string.IsNullOrEmpty(nightInfoText);
 
         private string copyFeedbackText = string.Empty;
 
@@ -326,6 +483,86 @@ namespace NINA.Plugin.ExposureBudget.ViewModel {
             get => clipboardText;
             private set { clipboardText = value; RaisePropertyChanged(); }
         }
+
+        private string filterPlanTotalsText = string.Empty;
+
+        /// <summary>Totaux du plan : pourcentage, nombre de poses et durée couverte.</summary>
+        public string FilterPlanTotalsText {
+            get => filterPlanTotalsText;
+            private set { filterPlanTotalsText = value; RaisePropertyChanged(); }
+        }
+
+        private string filterPlanRemainingText = string.Empty;
+
+        /// <summary>Temps disponible non couvert par le plan (vide en cas de dépassement).</summary>
+        public string FilterPlanRemainingText {
+            get => filterPlanRemainingText;
+            private set { filterPlanRemainingText = value; RaisePropertyChanged(); }
+        }
+
+        private string filterPlanErrorText = string.Empty;
+
+        /// <summary>Message de refus du plan (pourcentages &gt; 100 %, ou poses qui dépassent la fenêtre).</summary>
+        public string FilterPlanErrorText {
+            get => filterPlanErrorText;
+            private set { filterPlanErrorText = value; RaisePropertyChanged(); }
+        }
+
+        private bool hasFilterPlanError;
+
+        public bool HasFilterPlanError {
+            get => hasFilterPlanError;
+            private set { hasFilterPlanError = value; RaisePropertyChanged(); }
+        }
+
+        private bool hasFilterPlan;
+
+        /// <summary>Vrai si le plan contient au moins une ligne (la vue masque sinon le tableau).</summary>
+        public bool HasFilterPlan {
+            get => hasFilterPlan;
+            private set { hasFilterPlan = value; RaisePropertyChanged(); }
+        }
+
+        private string filterPlanClipboardText = string.Empty;
+
+        /// <summary>Texte copié par « Copier le plan » : une ligne par filtre actif.</summary>
+        public string FilterPlanClipboardText {
+            get => filterPlanClipboardText;
+            private set { filterPlanClipboardText = value; RaisePropertyChanged(); }
+        }
+
+        private string filterPlanStatusText = string.Empty;
+
+        /// <summary>Retour du bouton « Copier le plan ».</summary>
+        public string FilterPlanStatusText {
+            get => filterPlanStatusText;
+            private set { filterPlanStatusText = value; RaisePropertyChanged(); }
+        }
+
+        private bool hasFilterPlanStatus;
+
+        public bool HasFilterPlanStatus {
+            get => hasFilterPlanStatus;
+            private set { hasFilterPlanStatus = value; RaisePropertyChanged(); }
+        }
+
+        private bool canCopyFilterPlan;
+
+        /// <summary>
+        /// Vrai quand le plan peut être copié : au moins une ligne de résultat et aucun refus,
+        /// pour ne jamais exporter un plan incohérent.
+        /// </summary>
+        public bool CanCopyFilterPlan {
+            get => canCopyFilterPlan;
+            private set { canCopyFilterPlan = value; RaisePropertyChanged(); }
+        }
+
+        /// <summary>Rappel de la surcharge utilisée par le plan (vide si aucune).</summary>
+        public string PlanOverheadHintText => overheadSeconds > 0d
+            ? string.Format(strings.Culture, strings.PlanOverheadHintFormat, FormatDuration(TimeSpan.FromSeconds(overheadSeconds)))
+            : string.Empty;
+
+        public bool HasPlanOverhead => overheadSeconds > 0d;
 
         #endregion Résultats
 
@@ -371,8 +608,12 @@ namespace NINA.Plugin.ExposureBudget.ViewModel {
             RaisePropertyChanged(nameof(EndHour));
             RaisePropertyChanged(nameof(EndMinute));
 
-            NightInfoText = string.Format(strings.Culture, strings.NightInfoFormat,
-                source, dusk.Date, dusk, dawn, dawn);
+            // Le resultat est deja visible dans les heures de debut et de fin : on ne repete pas
+            // les horaires. Le message ne sert qu'a signaler un repli (pas de crepuscule
+            // astronomique cette nuit-la).
+            NightInfoText = source == strings.NightAstronomical
+                ? string.Empty
+                : string.Format(strings.Culture, strings.NightFallbackInfoFormat, source);
 
             SaveSettings();
             Recalculate();
@@ -459,6 +700,195 @@ namespace NINA.Plugin.ExposureBudget.ViewModel {
 
         #endregion Commandes
 
+        #region Plan par filtres
+
+        /// <summary>Construit les lignes du plan à partir des réglages mémorisés.</summary>
+        private void BuildFilterPlanRows() {
+            var plan = settings.FilterPlan ?? ExposureBudgetSettings.CreateDefaultFilterPlan();
+            if (plan.Count == 0) { plan = ExposureBudgetSettings.CreateDefaultFilterPlan(); }
+
+            FilterPlan.Clear();
+            foreach (var entry in plan) {
+                FilterPlan.Add(new FilterPlanRowVM(entry.Clone(), OnFilterPlanRowChanged));
+            }
+
+            HasFilterPlan = FilterPlan.Count > 0;
+        }
+
+        private void OnFilterPlanRowChanged() {
+            Recalculate();
+        }
+
+        /// <summary>Coche tous les filtres du plan (les valeurs de pose et de % sont conservées).</summary>
+        private void CheckAllFilters() {
+            foreach (var row in FilterPlan) {
+                row.Enabled = true;
+            }
+        }
+
+        /// <summary>Répartit 100 % entre les filtres cochés, par pas de 5 points.</summary>
+        private void DistributeFilters() {
+            var entries = FilterPlan.Select(x => x.Entry).ToList();
+            FilterPlanCalculator.DistributeEvenly(entries);
+
+            foreach (var row in FilterPlan) {
+                row.RaiseAllChanged();
+            }
+
+            Recalculate();
+        }
+
+        /// <summary>Remet le plan à ses valeurs par défaut (les filtres usuels, répartis sur 100 %).</summary>
+        private void ResetFilterPlan() {
+            settings.FilterPlan = ExposureBudgetSettings.CreateDefaultFilterPlan();
+            BuildFilterPlanRows();
+            Recalculate();
+        }
+
+        /// <summary>Ajoute un filtre en fin de liste (nom modifiable, 120 s, 0 %).</summary>
+        private void AddFilter() {
+            FilterPlan.Add(new FilterPlanRowVM(
+                new FilterPlanEntry(strings.FilterNewName, true, 120d, 0),
+                OnFilterPlanRowChanged));
+
+            HasFilterPlan = FilterPlan.Count > 0;
+            Recalculate();
+        }
+
+        /// <summary>Supprime le dernier filtre de la liste (la liste ne peut pas être vidée).</summary>
+        private void RemoveLastFilter() {
+            if (FilterPlan.Count <= 1) { return; }
+
+            FilterPlan.RemoveAt(FilterPlan.Count - 1);
+            Recalculate();
+        }
+
+        /// <summary>
+        /// Copie le plan par filtres : une ligne par filtre actif (« L : 48 × 120 s (01:36:00) »),
+        /// puis les totaux et le reliquat. Utile pour configurer la séquence dans N.I.N.A.
+        /// </summary>
+        private void CopyFilterPlan() {
+            var text = FilterPlanClipboardText;
+            if (string.IsNullOrEmpty(text)) { return; }
+
+            try {
+                Clipboard.SetText(text);
+                SetFilterPlanStatus(strings.FilterPlanCopyFeedback);
+            } catch (Exception ex) {
+                Logger.Warning($"ExposureBudget: could not access the clipboard ({ex.Message})");
+                SetFilterPlanStatus(strings.CopyFailedFeedback);
+            }
+        }
+
+        private void SetFilterPlanStatus(string message) {
+            FilterPlanStatusText = message;
+            HasFilterPlanStatus = !string.IsNullOrEmpty(message);
+        }
+
+        /// <summary>Construit le texte du plan : une ligne par filtre actif, puis les totaux.</summary>
+        private string BuildFilterPlanClipboardText(FilterPlanResult result) {
+            var lines = new List<string>();
+
+            foreach (var line in result.Lines) {
+                if (!line.Enabled || !line.HasValidExposure || line.Count <= 0) { continue; }
+
+                lines.Add(string.Format(strings.Culture, strings.FilterPlanLineFormat,
+                    line.Name,
+                    FormatInteger(line.Count),
+                    FormatNumber((decimal)line.Entry.ExposureSeconds),
+                    FormatDuration(line.Covered)));
+            }
+
+            if (lines.Count == 0) { return string.Empty; }
+
+            lines.Add(string.Format(strings.Culture, strings.FilterTotalsFormat,
+                result.TotalPercent.ToString("0", strings.Culture),
+                FormatInteger(result.TotalCount),
+                PoseWord(result.TotalCount),
+                FormatDuration(result.TotalCovered)));
+
+            if (result.Remaining >= TimeSpan.Zero) {
+                lines.Add(string.Format(strings.Culture, strings.FilterRemainingFormat, FormatDuration(result.Remaining)));
+            }
+
+            return string.Join(Environment.NewLine, lines);
+        }
+
+        /// <summary>
+        /// Recalcule le plan par filtres pour la fenêtre courante : nombre de poses par filtre,
+        /// totaux, et **refus** si les pourcentages dépassent 100 % ou si les poses arrondies
+        /// dépassent la fenêtre (aucun arbitrage automatique : l'utilisateur corrige une entrée).
+        /// </summary>
+        private void RecalculateFilterPlan(TimeSpan window) {
+            if (FilterPlan.Count == 0) {
+                HasFilterPlan = false;
+                FilterPlanTotalsText = string.Empty;
+                FilterPlanRemainingText = string.Empty;
+                FilterPlanClipboardText = string.Empty;
+                SetFilterPlanError(string.Empty);
+                CanCopyFilterPlan = false;
+                return;
+            }
+
+            HasFilterPlan = true;
+
+            var result = FilterPlanCalculator.Compute(window, FilterPlan.Select(x => x.Entry), overheadSeconds);
+
+            for (var i = 0; i < FilterPlan.Count && i < result.Lines.Count; i++) {
+                var line = result.Lines[i];
+                FilterPlan[i].CountText = line.Enabled && line.HasValidExposure && window > TimeSpan.Zero
+                    ? FormatInteger(line.Count)
+                    : strings.EmptyCountDisplay;
+
+                // Bouton « attribuer le reliquat » : actif si des points restent et que ce filtre
+                // peut les recevoir.
+                FilterPlan[i].SetRemainderAvailability(result.UnusedPercent);
+            }
+
+            FilterPlanTotalsText = string.Format(strings.Culture, strings.FilterTotalsFormat,
+                result.TotalPercent.ToString("0", strings.Culture),
+                FormatInteger(result.TotalCount),
+                PoseWord(result.TotalCount),
+                FormatDuration(result.TotalCovered));
+
+            FilterPlanRemainingText = result.Remaining >= TimeSpan.Zero
+                ? string.Format(strings.Culture, strings.FilterRemainingFormat, FormatDuration(result.Remaining))
+                : string.Empty;
+
+            FilterPlanClipboardText = BuildFilterPlanClipboardText(result);
+
+            // Le retour de copie ne concerne que l'etat precedent : on l'efface.
+            SetFilterPlanStatus(string.Empty);
+
+            var messages = new List<string>();
+
+            if (result.IsEmpty) {
+                messages.Add(strings.FilterEmptyWarning);
+            }
+
+            if (result.PercentOverflow) {
+                messages.Add(string.Format(strings.Culture, strings.FilterPercentOverflowFormat,
+                    result.TotalPercent.ToString("0", strings.Culture)));
+            }
+
+            if (result.CoverageOverflow) {
+                messages.Add(string.Format(strings.Culture, strings.FilterCoverageOverflowFormat,
+                    FormatDuration(result.Overrun)));
+            }
+
+            SetFilterPlanError(string.Join(Environment.NewLine, messages));
+
+            // On n'exporte jamais un plan incohérent (pourcentages ou fenêtre dépassés).
+            CanCopyFilterPlan = !string.IsNullOrEmpty(FilterPlanClipboardText) && !HasFilterPlanError;
+        }
+
+        private void SetFilterPlanError(string message) {
+            FilterPlanErrorText = message;
+            HasFilterPlanError = !string.IsNullOrEmpty(message);
+        }
+
+        #endregion Plan par filtres
+
         #region Calcul
 
         /// <summary>
@@ -481,7 +911,7 @@ namespace NINA.Plugin.ExposureBudget.ViewModel {
 
             ExposureCountResult result;
             try {
-                result = ExposureBudgetCalculator.Compute(window, exposureSeconds);
+                result = ExposureBudgetCalculator.Compute(window, exposureSeconds, overheadSeconds, BuildNightReserves());
             } catch (Exception ex) {
                 Logger.Error("ExposureBudget: computation failed", ex);
                 PoseCountText = strings.EmptyCountDisplay;
@@ -492,30 +922,47 @@ namespace NINA.Plugin.ExposureBudget.ViewModel {
                 ClipboardText = string.Empty;
                 SetCopyFeedback(string.Empty);
                 SetWarning(strings.InvalidExposureWarning);
+                RecalculateFilterPlan(window);
                 return;
             }
 
             PoseCountText = FormatInteger(result.Count);
-            ResultDetailText = string.Format(strings.Culture, strings.ResultDetailFormat,
-                FormatNumber((decimal)window.TotalSeconds),
-                FormatNumber((decimal)result.ExposureSeconds),
-                result.ExactCount.ToString("0.###", strings.Culture),
-                FormatInteger(result.Count),
-                PoseWord(result.Count));
+            ResultDetailText = result.OverheadSeconds > 0d
+                ? string.Format(strings.Culture, strings.OverheadDetailFormat,
+                    FormatNumber((decimal)result.UsableWindow.TotalSeconds),
+                    FormatNumber((decimal)result.ExposureSeconds),
+                    FormatNumber(result.PerPoseSeconds - (decimal)result.ExposureSeconds),
+                    result.ExactCount.ToString("0.###", strings.Culture),
+                    FormatInteger(result.Count),
+                    PoseWord(result.Count))
+                : string.Format(strings.Culture, strings.ResultDetailFormat,
+                    FormatNumber((decimal)result.UsableWindow.TotalSeconds),
+                    FormatNumber((decimal)result.ExposureSeconds),
+                    result.ExactCount.ToString("0.###", strings.Culture),
+                    FormatInteger(result.Count),
+                    PoseWord(result.Count));
 
             RoundingText = DescribeRounding(result);
 
+            // Le temps couvert reste la somme des temps d'exposition ; le reliquat est calcule
+            // sur le temps reellement consomme (surcharges et reserves comprises).
             var covered = TimeSpan.FromSeconds((double)result.CoveredSeconds);
-            var remaining = window - covered;
+            var remaining = TimeSpan.FromSeconds((double)result.RemainingSeconds);
             CoverageText = string.Format(strings.Culture, strings.CoverageFormat,
                 FormatDuration(covered),
                 FormatInteger(result.Count),
                 FormatNumber((decimal)result.ExposureSeconds),
                 FormatDuration(remaining));
 
-            PoseEndDateTimeText = result.Count > 0
-                ? string.Format(strings.Culture, strings.PoseEndFormat, (start + covered).ToString("dd/MM/yyyy HH:mm:ss", strings.Culture))
-                : string.Empty;
+            // Fin de la derniere exposition : les surcharges s'appliquent entre les poses, pas
+            // apres la derniere.
+            if (result.Count > 0) {
+                var endOffset = TimeSpan.FromSeconds((double)result.ConsumedSeconds - result.OverheadSeconds);
+                PoseEndDateTimeText = string.Format(strings.Culture, strings.PoseEndFormat,
+                    (start + endOffset).ToString("dd/MM/yyyy HH:mm:ss", strings.Culture));
+            } else {
+                PoseEndDateTimeText = string.Empty;
+            }
 
             // Le bouton « Copier le résultat » ne dépose que le nombre de poses.
             ClipboardText = PoseCountText;
@@ -523,7 +970,15 @@ namespace NINA.Plugin.ExposureBudget.ViewModel {
             // La confirmation de copie ne concerne que l'etat precedent : on l'efface.
             SetCopyFeedback(string.Empty);
 
+            ReservesSummaryText = BuildReservesSummary(result);
+            RaisePropertyChanged(nameof(HasReserves));
+            RaisePropertyChanged(nameof(OverheadInfoText));
+            RaisePropertyChanged(nameof(HasOverhead));
+            RaisePropertyChanged(nameof(PlanOverheadHintText));
+            RaisePropertyChanged(nameof(HasPlanOverhead));
+
             RefreshWarnings(result, window);
+            RecalculateFilterPlan(window);
             SaveSettings();
         }
 
@@ -546,9 +1001,12 @@ namespace NINA.Plugin.ExposureBudget.ViewModel {
 
             if (window == TimeSpan.Zero) {
                 warnings.Add(strings.WarningSameHours);
+            } else if (result.ReservesExceedWindow) {
+                var excess = result.ReservedSeconds - window;
+                warnings.Add(string.Format(strings.Culture, strings.ReservesExceedFormat, FormatDuration(excess)));
             } else if (result.Count == 0) {
                 warnings.Add(string.Format(strings.Culture, strings.WarningExposureTooLongFormat,
-                    FormatNumber((decimal)result.ExposureSeconds), FormatDuration(window)));
+                    FormatNumber(result.PerPoseSeconds), FormatDuration(result.UsableWindow)));
             } else if (result.Overflows) {
                 var overrun = TimeSpan.FromSeconds((double)(-result.RemainingSeconds));
                 warnings.Add(string.Format(strings.Culture, strings.WarningOverrunFormat,
@@ -558,6 +1016,17 @@ namespace NINA.Plugin.ExposureBudget.ViewModel {
             }
 
             SetWarning(string.Join(Environment.NewLine, warnings));
+        }
+
+        /// <summary>Résumé des réserves (« réservé · exploitable ») ou message d'absence.</summary>
+        private string BuildReservesSummary(ExposureCountResult result) {
+            if (BuildNightReserves().IsEmpty) {
+                return strings.ReservesEmptyHint;
+            }
+
+            return string.Format(strings.Culture, strings.ReservesSummaryFormat,
+                FormatDuration(result.ReservedSeconds),
+                FormatDuration(result.UsableWindow));
         }
 
         private void SetWarning(string message) {
@@ -618,6 +1087,15 @@ namespace NINA.Plugin.ExposureBudget.ViewModel {
             settings.EndHour = endHour;
             settings.EndMinute = endMinute;
             settings.ExposureSeconds = exposureSeconds;
+            settings.OverheadSeconds = overheadSeconds;
+            settings.FlipReserveMinutes = flipReserveMinutes;
+            settings.FixedReserveMinutes = fixedReserveMinutes;
+            settings.AutofocusEvery = autofocusEvery;
+            settings.AutofocusSeconds = autofocusSeconds;
+
+            // Plan par filtres : on repart d'une copie pour ne pas exposer les objets de la vue.
+            settings.FilterPlan = FilterPlan.Select(row => row.Entry.Clone()).ToList();
+
             settings.Save();
         }
 

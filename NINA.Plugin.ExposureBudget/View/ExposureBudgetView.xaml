@@ -16,6 +16,49 @@
 
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+
+        <!--
+            Petite case à cocher pour le plan par filtres. N.I.N.A. ne fournit que des cases
+            « interrupteur » (65 x 25 px) ou des icônes cerclées, toutes deux trop larges ou
+            sans affichage de contenu pour une grille étroite : ce gabarit local reste dans le
+            style de l'application (couleurs du thème) et tient en 20 x 20.
+        -->
+        <Style x:Key="FilterCheckBox" TargetType="{x:Type CheckBox}">
+            <Setter Property="Width" Value="20" />
+            <Setter Property="Height" Value="20" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type CheckBox}">
+                        <Border
+                            x:Name="Box"
+                            Background="{DynamicResource SecondaryBackgroundBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="3">
+                            <Path
+                                x:Name="Tick"
+                                Margin="3"
+                                Data="M 0,4 L 3,7.5 L 9,0"
+                                Stretch="Uniform"
+                                Stroke="{DynamicResource PrimaryBrush}"
+                                StrokeEndLineCap="Round"
+                                StrokeStartLineCap="Round"
+                                StrokeThickness="1.8"
+                                Visibility="Collapsed" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Tick" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Box" Property="Background" Value="{DynamicResource ButtonBackgroundSelectedBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </UserControl.Resources>
 
     <!--
@@ -37,6 +80,9 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
@@ -161,11 +207,53 @@
                             Foreground="{DynamicResource ButtonForegroundDisabledBrush}"
                             Text="{Binding EndDateTimeText}" />
                     </StackPanel>
+
+                    <!--  Le bouton « nuit astronomique » définit la FENÊTRE (le delta d'heures) :
+                          il vit donc ici, avec les heures, et non dans un onglet de calcul.
+                          Ligne pleine largeur, sous les informations de la fenêtre.  -->
+                    <Button
+                        Grid.Row="4"
+                        Grid.Column="0"
+                        Grid.ColumnSpan="5"
+                        Height="26"
+                        Margin="0,8,0,0"
+                        Command="{Binding UseNightTimesCommand}"
+                        Content="{Binding Labels.NightButtonText}"
+                        ToolTip="{Binding Labels.NightButtonTooltip}" />
+
+                    <!--  Message court : uniquement quand le résultat n'est pas déjà visible dans
+                          les heures de début et de fin (repli sur un autre crépuscule).  -->
+                    <TextBlock
+                        Grid.Row="5"
+                        Grid.Column="0"
+                        Grid.ColumnSpan="5"
+                        Margin="0,4,0,0"
+                        FontSize="11"
+                        Foreground="{DynamicResource ButtonForegroundDisabledBrush}"
+                        Text="{Binding NightInfoText}"
+                        TextWrapping="Wrap"
+                        Visibility="{Binding HasNightInfo, Converter={StaticResource BoolToVisibility}}" />
+
+                    <TextBlock
+                        Grid.Row="6"
+                        Grid.Column="0"
+                        Grid.ColumnSpan="5"
+                        Margin="0,4,0,0"
+                        FontSize="11"
+                        Foreground="{DynamicResource NotificationWarningTextBrush}"
+                        Text="{Binding ReservesSummaryText}"
+                        TextWrapping="Wrap"
+                        Visibility="{Binding HasReserves, Converter={StaticResource BoolToVisibility}}" />
                 </Grid>
             </GroupBox>
 
+            <!--  Trois onglets : pose unique, plan par filtres, temps a reserver.  -->
+            <TabControl Margin="0,10,0,0">
+                <TabItem Header="{Binding Labels.TabSingleExposure}">
+                    <StackPanel Margin="0,6,0,0">
+
             <GroupBox
-                Margin="0,10,0,0"
+                Margin="0,0,0,0"
                 Padding="0,4,0,6"
                 Header="{Binding Labels.ExposureGroupHeader}">
                 <StackPanel>
@@ -223,18 +311,38 @@
                         Foreground="{DynamicResource ButtonForegroundDisabledBrush}"
                         Text="{Binding ExposureDecimalMinutes}" />
 
-                    <Button
-                        Height="26"
-                        Margin="0,8,0,0"
-                        Command="{Binding UseNightTimesCommand}"
-                        Content="{Binding Labels.NightButtonText}"
-                        ToolTip="{Binding Labels.NightButtonTooltip}" />
-                    <TextBlock
-                        Margin="0,4,0,0"
-                        FontSize="11"
-                        Foreground="{DynamicResource ButtonForegroundDisabledBrush}"
-                        Text="{Binding NightInfoText}"
-                        TextWrapping="Wrap" />
+                    <!--  Surcharge par pose : temps réellement consommé par une pose (téléchargement,
+                          dither, stabilisation). 0 = comportement d'origine.  -->
+                    <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock
+                            Grid.Column="0"
+                            VerticalAlignment="Center"
+                            Text="{Binding Labels.OverheadLabel}" />
+                        <ninactrl:PrecisionStepperControl
+                            Grid.Column="1"
+                            Width="96"
+                            Height="24"
+                            Margin="6,0,0,0"
+                            MaxValue="{Binding MaxOverheadSeconds}"
+                            MinValue="0"
+                            StepSize="{Binding OverheadStepSeconds}"
+                            ToolTip="{Binding Labels.OverheadTooltip}"
+                            Unit="s"
+                            Value="{Binding ExposureOverheadSeconds, Mode=TwoWay}" />
+                        <TextBlock
+                            Grid.Column="2"
+                            Margin="8,0,0,0"
+                            VerticalAlignment="Center"
+                            FontSize="11"
+                            Foreground="{DynamicResource ButtonForegroundDisabledBrush}"
+                            Text="{Binding OverheadInfoText}"
+                            TextWrapping="Wrap" />
+                    </Grid>
                 </StackPanel>
             </GroupBox>
 
@@ -295,6 +403,307 @@
                     Text="{Binding WarningText}"
                     TextWrapping="Wrap" />
             </Border>
+
+                    </StackPanel>
+                </TabItem>
+
+                <!--  Plan par filtres : une ligne par filtre (case à cocher, pose, %, poses).  -->
+                <TabItem Header="{Binding Labels.TabFilterPlan}">
+                    <StackPanel Margin="0,6,0,0">
+
+                        <WrapPanel>
+                            <Button
+                                Height="24"
+                                Padding="6,0"
+                                Command="{Binding CheckAllFiltersCommand}"
+                                Content="{Binding Labels.FilterCheckAllButton}" />
+                            <Button
+                                Height="24"
+                                Margin="6,0,0,0"
+                                Padding="6,0"
+                                Command="{Binding DistributeFiltersCommand}"
+                                Content="{Binding Labels.FilterDistributeButton}" />
+                            <Button
+                                Height="24"
+                                Margin="6,4,0,0"
+                                Padding="6,0"
+                                Command="{Binding ResetFilterPlanCommand}"
+                                Content="{Binding Labels.FilterResetButton}" />
+                            <Button
+                                Height="24"
+                                Margin="6,4,0,0"
+                                Padding="6,0"
+                                Command="{Binding AddFilterCommand}"
+                                Content="{Binding Labels.FilterAddButton}"
+                                ToolTip="{Binding Labels.FilterAddTooltip}" />
+                            <Button
+                                Height="24"
+                                Margin="6,4,0,0"
+                                Padding="6,0"
+                                Command="{Binding RemoveLastFilterCommand}"
+                                Content="{Binding Labels.FilterRemoveButton}"
+                                ToolTip="{Binding Labels.FilterRemoveTooltip}" />
+                        </WrapPanel>
+
+                        <!--  En-tête du tableau : mêmes colonnes que les lignes.
+                              [case 22] [filtre 56] [pose 92] [% 80] [reliquat 24] [poses *]  -->
+                        <Grid Margin="0,10,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="22" />
+                                <ColumnDefinition Width="56" />
+                                <ColumnDefinition Width="92" />
+                                <ColumnDefinition Width="80" />
+                                <ColumnDefinition Width="24" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock
+                                Grid.Column="1"
+                                FontSize="11"
+                                Foreground="{DynamicResource ButtonForegroundDisabledBrush}"
+                                Text="{Binding Labels.FilterColumn}" />
+                            <TextBlock
+                                Grid.Column="2"
+                                FontSize="11"
+                                Foreground="{DynamicResource ButtonForegroundDisabledBrush}"
+                                Text="{Binding Labels.FilterExposureColumn}"
+                                TextAlignment="Center" />
+                            <TextBlock
+                                Grid.Column="3"
+                                FontSize="11"
+                                Foreground="{DynamicResource ButtonForegroundDisabledBrush}"
+                                Text="{Binding Labels.FilterPercentColumn}"
+                                TextAlignment="Center" />
+                            <TextBlock
+                                Grid.Column="5"
+                                HorizontalAlignment="Right"
+                                FontSize="11"
+                                Foreground="{DynamicResource ButtonForegroundDisabledBrush}"
+                                Text="{Binding Labels.FilterCountColumn}" />
+                        </Grid>
+
+                        <!--  Une ligne par filtre  -->
+                        <ItemsControl Margin="0,2,0,0" ItemsSource="{Binding FilterPlan}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,3,0,3">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="22" />
+                                            <ColumnDefinition Width="56" />
+                                            <ColumnDefinition Width="92" />
+                                            <ColumnDefinition Width="80" />
+                                            <ColumnDefinition Width="24" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <CheckBox
+                                            Grid.Column="0"
+                                            IsChecked="{Binding Enabled, Mode=TwoWay}"
+                                            Style="{StaticResource FilterCheckBox}"
+                                            ToolTip="{Binding DataContext.Labels.FilterPercentTooltip, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+
+                                        <!--  Nom modifiable du filtre  -->
+                                        <TextBox
+                                            Grid.Column="1"
+                                            Margin="2,0,4,0"
+                                            VerticalContentAlignment="Center"
+                                            FontWeight="Bold"
+                                            Text="{Binding Name, Mode=TwoWay}"
+                                            ToolTip="{Binding DataContext.Labels.FilterNameTooltip, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+
+                                        <ninactrl:PrecisionStepperControl
+                                            Grid.Column="2"
+                                            Height="24"
+                                            Margin="4,0,0,0"
+                                            MaxValue="{Binding MaxExposureSeconds}"
+                                            MinValue="{Binding MinExposureSeconds}"
+                                            StepSize="{Binding ExposureStepSeconds}"
+                                            ToolTip="{Binding DataContext.Labels.FilterExposureTooltip, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            Unit="s"
+                                            Value="{Binding ExposureSeconds, Mode=TwoWay}" />
+
+                                        <ninactrl:IntStepperControl
+                                            Grid.Column="3"
+                                            Height="24"
+                                            Margin="2,0,0,0"
+                                            MaxValue="{Binding MaxPercent}"
+                                            MinValue="{Binding MinPercent}"
+                                            StepSize="{Binding PercentStep}"
+                                            ToolTip="{Binding DataContext.Labels.FilterPercentTooltip, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            Value="{Binding Percent, Mode=TwoWay}" />
+
+                                        <!--  Attribuer les pourcentages non utilisés à ce filtre  -->
+                                        <Button
+                                            Grid.Column="4"
+                                            Width="22"
+                                            Height="22"
+                                            Padding="0"
+                                            VerticalAlignment="Center"
+                                            Command="{Binding ReceiveRemainderCommand}"
+                                            Content="{Binding DataContext.Labels.FilterRemainderButton, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            IsEnabled="{Binding CanReceiveRemainder}"
+                                            ToolTip="{Binding DataContext.Labels.FilterRemainderTooltip, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+
+                                        <TextBlock
+                                            Grid.Column="5"
+                                            Margin="4,0,0,0"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center"
+                                            FontWeight="Bold"
+                                            Text="{Binding CountText}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!--  Totaux et contrôles  -->
+                        <TextBlock
+                            Margin="0,10,0,0"
+                            HorizontalAlignment="Center"
+                            FontWeight="Bold"
+                            Text="{Binding FilterPlanTotalsText}"
+                            TextWrapping="Wrap" />
+                        <TextBlock
+                            Margin="0,2,0,0"
+                            HorizontalAlignment="Center"
+                            FontSize="11"
+                            Foreground="{DynamicResource ButtonForegroundDisabledBrush}"
+                            Text="{Binding FilterPlanRemainingText}" />
+
+                        <Border
+                            Margin="0,8,0,0"
+                            Padding="6"
+                            Background="{DynamicResource NotificationWarningBrush}"
+                            Visibility="{Binding HasFilterPlanError, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock
+                                Foreground="{DynamicResource NotificationWarningTextBrush}"
+                                Text="{Binding FilterPlanErrorText}"
+                                TextWrapping="Wrap" />
+                        </Border>
+
+                        <Button
+                            Height="26"
+                            Margin="0,10,0,0"
+                            Command="{Binding CopyFilterPlanCommand}"
+                            IsEnabled="{Binding CanCopyFilterPlan}"
+                            Content="{Binding Labels.FilterPlanCopyButton}"
+                            ToolTip="{Binding Labels.FilterPlanCopyTooltip}" />
+                        <TextBlock
+                            Margin="0,4,0,0"
+                            HorizontalAlignment="Center"
+                            FontSize="11"
+                            Foreground="{DynamicResource ButtonForegroundDisabledBrush}"
+                            Text="{Binding FilterPlanStatusText}"
+                            TextWrapping="Wrap"
+                            Visibility="{Binding HasFilterPlanStatus, Converter={StaticResource BoolToVisibility}}" />
+                    </StackPanel>
+                </TabItem>
+
+                <!--  Temps à réserver : opérations de la nuit qui ne prennent pas de poses.  -->
+                <TabItem Header="{Binding Labels.ReservesTabTitle}">
+                    <StackPanel Margin="0,6,0,0">
+                        <TextBlock
+                            FontSize="11"
+                            Foreground="{DynamicResource ButtonForegroundDisabledBrush}"
+                            Text="{Binding Labels.ReservesIntro}"
+                            TextWrapping="Wrap" />
+                        <TextBlock
+                            Margin="0,4,0,0"
+                            FontSize="11"
+                            Foreground="{DynamicResource ButtonForegroundDisabledBrush}"
+                            Text="{Binding PlanOverheadHintText}"
+                            TextWrapping="Wrap"
+                            Visibility="{Binding HasPlanOverhead, Converter={StaticResource BoolToVisibility}}" />
+
+                        <Grid Margin="0,10,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock
+                                Grid.Row="0"
+                                Grid.Column="0"
+                                VerticalAlignment="Center"
+                                Text="{Binding Labels.FlipReserveLabel}"
+                                TextWrapping="Wrap" />
+                            <ninactrl:PrecisionStepperControl
+                                Grid.Row="0"
+                                Grid.Column="1"
+                                Width="96"
+                                Height="24"
+                                Margin="6,4,0,0"
+                                MaxValue="600"
+                                MinValue="0"
+                                StepSize="1"
+                                Value="{Binding FlipReserveMinutes, Mode=TwoWay}" />
+
+                            <TextBlock
+                                Grid.Row="1"
+                                Grid.Column="0"
+                                VerticalAlignment="Center"
+                                Text="{Binding Labels.FixedReserveLabel}"
+                                TextWrapping="Wrap" />
+                            <ninactrl:PrecisionStepperControl
+                                Grid.Row="1"
+                                Grid.Column="1"
+                                Width="96"
+                                Height="24"
+                                Margin="6,4,0,0"
+                                MaxValue="600"
+                                MinValue="0"
+                                StepSize="1"
+                                Value="{Binding FixedReserveMinutes, Mode=TwoWay}" />
+
+                            <TextBlock
+                                Grid.Row="2"
+                                Grid.Column="0"
+                                VerticalAlignment="Center"
+                                Text="{Binding Labels.AutofocusEveryLabel}"
+                                TextWrapping="Wrap" />
+                            <ninactrl:IntStepperControl
+                                Grid.Row="2"
+                                Grid.Column="1"
+                                Width="96"
+                                Height="24"
+                                Margin="6,4,0,0"
+                                MaxValue="1000"
+                                MinValue="0"
+                                StepSize="1"
+                                Value="{Binding AutofocusEvery, Mode=TwoWay}" />
+
+                            <TextBlock
+                                Grid.Row="3"
+                                Grid.Column="0"
+                                VerticalAlignment="Center"
+                                Text="{Binding Labels.AutofocusDurationLabel}"
+                                TextWrapping="Wrap" />
+                            <ninactrl:PrecisionStepperControl
+                                Grid.Row="3"
+                                Grid.Column="1"
+                                Width="96"
+                                Height="24"
+                                Margin="6,4,0,0"
+                                MaxValue="3600"
+                                MinValue="0"
+                                StepSize="5"
+                                Value="{Binding AutofocusDurationSeconds, Mode=TwoWay}" />
+                        </Grid>
+
+                        <TextBlock
+                            Margin="0,12,0,0"
+                            HorizontalAlignment="Center"
+                            FontWeight="Bold"
+                            Text="{Binding ReservesSummaryText}"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                </TabItem>
+            </TabControl>
         </StackPanel>
     </ScrollViewer>
 </UserControl>

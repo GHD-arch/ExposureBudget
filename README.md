@@ -47,24 +47,34 @@ bouton « calculer » : il serait redondant).
 | Règle | Détail |
 |---|---|
 | Fenêtre | `ΔT = Hf − Hd` ; **+ 24 h si Hf ≤ Hd** (la fin appartient au lendemain) |
-| Nombre exact | `N = ΔT / temps de pose` |
+| Fenêtre exploitable | `ΔT − réserves` (retournement au méridien, autofocus toutes les N poses, marge fixe) |
+| Temps consommé par une pose | `temps de pose + surcharge` (téléchargement, dither, stabilisation) |
+| Nombre exact | `N = fenêtre exploitable / temps consommé par une pose` |
 | Arrondi | partie décimale **< 0,5 → pose inférieure** ; **≥ 0,5 → une pose de plus** |
+| Temps couvert | `poses retenues × temps de pose` (la surcharge n'entre pas dans l'intégration) |
+| Fin de la dernière pose | `début + temps consommé − surcharge` (la surcharge s'applique **entre** les poses) |
+| Plan par filtres | `temps alloué = ΔT × % / 100`, puis la même règle d'arrondi ; **refus** si les pourcentages dépassent 100 % ou si le temps consommé arrondi dépasse `ΔT` |
 | Calcul de précision | arithmétique décimale : les cas limites type `34,5` sont exacts, sans imprécision flottante |
 
 (Hd = heure de début, Hf = heure de fin ; dans le panneau ces deux valeurs sont simplement
-libellées **Start** et **End**.)
+libellées **Start** et **End**. Sans surcharge ni réserve, les formules se réduisent au calcul
+d'origine `ΔT / temps de pose`.)
 
 Exemples vérifiés par les harnais du dépôt :
 
-| Hd → Hf | ΔT | Pose | N exact | Poses retenues | Remarque |
-|---|---|---|---|---|---|
-| 21:30 → 03:15 | 05:45:00 | 300 s | 69,00 | **69** | aucun reliquat |
-| 21:30 → 03:15 | 05:45:00 | 600 s | 34,50 | **35** | dépasse la fenêtre de 5 min (signalé) |
-| 21:30 → 03:15 | 05:45:00 | 1 200 s | 17,25 | **17** | 5 min inutilisées |
-| 21:30 → 03:21 | 05:51:00 | 300 s | 70,20 | **70** | 1 min inutilisée |
-| 21:30 → 03:21 | 05:51:00 | 120 s | 175,50 | **176** | cas du 0,5 → pose en plus |
-| 22:00 → 22:02 | 00:02:00 | 300 s | 0,40 | **0** | temps de pose trop long (signalé) |
-| 21:00 → 21:00 | 00:00:00 | 300 s | 0,00 | **0** | heures identiques (signalé) |
+| Hd → Hf | ΔT | Pose | Surcharge | N exact | Poses retenues | Remarque |
+|---|---|---|---|---|---|---|
+| 21:30 → 03:15 | 05:45:00 | 300 s | 0 | 69,00 | **69** | aucun reliquat |
+| 21:30 → 03:15 | 05:45:00 | 600 s | 0 | 34,50 | **35** | dépasse la fenêtre de 5 min (signalé) |
+| 21:30 → 03:15 | 05:45:00 | 1 200 s | 0 | 17,25 | **17** | 5 min inutilisées |
+| 21:30 → 03:21 | 05:51:00 | 300 s | 0 | 70,20 | **70** | 1 min inutilisée |
+| 21:30 → 03:21 | 05:51:00 | 120 s | 0 | 175,50 | **176** | cas du 0,5 → pose en plus |
+| 21:30 → 03:15 | 05:45:00 | 300 s | **5 s** | 67,87 | **68** | 20 700 ÷ 305 ; dépasse de 40 s (arrondi au-dessus) |
+| 21:30 → 03:15 | 05:45:00 | 250 s | **2 s** | 82,14 | **82** | 82 × 252 = 20 664 s, 36 s libres |
+| 21:30 → 03:15 | 05:45:00 | 300 s | 0 + **15 min réservées** | 66,00 | **66** | 19 800 ÷ 300 |
+| 21:30 → 03:15 | 05:45:00 | 300 s | 0 + **21 min réservées** (autofocus ×6) | 65,70 | **65** | itération : 65 poses → 6 passages |
+| 22:00 → 22:02 | 00:02:00 | 300 s | 0 | 0,40 | **0** | temps de pose trop long (signalé) |
+| 21:00 → 21:00 | 00:00:00 | 300 s | 0 | 0,00 | **0** | heures identiques (signalé) |
 
 L'interface affiche systématiquement le **nombre exact avec ses décimales**, la règle
 d'arrondi appliquée, le **temps couvert**, le **reliquat** (ou le **dépassement**) et
@@ -72,19 +82,26 @@ l'**horodatage de la dernière pose**.
 
 ## Contenu du panneau
 
+Le bloc **fenêtre d'acquisition** est toujours visible en haut (heures, bouton *Nuit
+astronomique*, durée et réserves) ; le reste est réparti en trois onglets : **Pose unique**
+(ci-dessous), **Plan par filtres** et **Temps à réserver**.
+
 - **Start** et **End** : deux ascenseurs `hh` (0–23) et `mm` (0–59) — contrôles
   natifs `IntStepperControl` de N.I.N.A., donc style et comportement identiques au reste de
   l'application (saisie au clavier possible dans la zone de texte).
+- **Astronomical night (N.I.N.A.)** : remplit l'heure de début et l'heure de fin avec le
+  crépuscule et l'aube **astronomiques** calculés par N.I.N.A. pour le profil d'observatoire
+  actif. Comme il ne définit que la **fenêtre** (le delta d'heures), il se trouve dans ce bloc,
+  sous les informations de la fenêtre, et non dans les onglets de calcul. Si le crépuscule
+  astronomique n'existe pas (nuit blanche aux hautes latitudes), le plugin replie
+  successivement sur le crépuscule **nautique**, le crépuscule **civil** puis le coucher/lever
+  du Soleil, et l'indique — les horaires ne sont pas répétés : ils sont déjà affichés dans les
+  heures de début et de fin.
 - **Available duration** calculée en direct, avec reconstitution de la séance
   (`10/10/2026 21:30 → 11/10/2026 03:15`), ce qui montre explicitement le passage au lendemain.
 - **Exposure** : ascenseur `StepperControl` réglé **de 15 s en 15 s** (saisie libre au clavier),
   bornes 0,1 s à 24 h.
 - **Champ d'information en minutes** à côté : `5 min 00 s` et `i.e. 5 min` (300 s = 5 min).
-- **Astronomical night (N.I.N.A.)** : remplit l'heure de début et l'heure de fin avec le
-  crépuscule et l'aube **astronomiques** calculés par N.I.N.A. pour le profil d'observatoire
-  actif. Si le crépuscule astronomique n'existe pas (nuit blanche aux hautes latitudes), le
-  plugin replie successivement sur le crépuscule **nautique**, le crépuscule **civil** puis le
-  coucher/lever du Soleil, et l'indique.
 - **Number of exposures** en grand, avec détails du calcul, arrondi, reliquat et
   avertissements (fenêtre nulle, temps de pose trop long, dépassement de la fenêtre).
   Tout est recalculé à chaque modification d'une valeur : aucun bouton n'est nécessaire.
@@ -92,9 +109,45 @@ l'**horodatage de la dernière pose**.
   reste à faire en cours de séance).
 - **Copy result** : copie **le nombre de poses** dans le presse-papiers (uniquement la valeur,
   par exemple `69`) et affiche une confirmation.
+- **Overhead** (surcharge) : temps consommé par chaque pose en plus de l'exposition elle-même
+  (téléchargement, dither, stabilisation), réglé de 1 s en 1 s. Le temps consommé par une pose
+  devient `exposition + surcharge` ; le temps couvert reste la somme des expositions. La
+  surcharge s'applique aussi au plan par filtres.
 
-Les derniers réglages (langue, heures et temps de pose) sont mémorisés dans
-`ExposureBudget.settings`, un petit fichier texte à côté du plugin, modifiable à la main.
+### Onglet « Temps à réserver »
+
+Déduit de la fenêtre les opérations qui ne prendront pas de poses : **retournement au méridien**
+(minutes), **autofocus toutes les N poses** avec sa durée, et **marge fixe** (minutes). Le nombre
+de poses est calculé sur la fenêtre **exploitable** ; comme les autofocus dépendent du nombre de
+poses, le calcul itère jusqu'à cohérence. Le résumé « réservé · exploitable » est rappelé en haut
+du panneau, et un avertissement s'affiche si les réserves dépassent la fenêtre.
+
+### Onglet « Plan par filtres » (caméra mono)
+
+Pour une caméra monochrome et une roue à filtres : une ligne par filtre (par défaut
+**L, R, G, B, S, H, O**), avec pour chacun une **case à cocher**, un **temps de pose** et un
+**pourcentage du temps disponible**. Le plugin affiche le nombre de poses par filtre et refuse
+le plan si les entrées ne tiennent pas :
+
+- temps alloué = `fenêtre × % / 100`, nombre de poses = règle du **0,5** (même règle que
+  l'onglet principal — un seul filtre à 100 % donne exactement le même résultat) ;
+- **refus** si `Σ % > 100 %` ;
+- **refus** si le **temps réellement couvert** par les poses arrondies dépasse la fenêtre
+  (exemple : 4 h, une pose de 9 600 s à 100 % → 1,5 → 2 poses = 5 h 20 → refusé) ;
+- totaux en bas (`100 % · 108 poses · 3 h 54`) et **reliquat** affiché (les secondes perdues par
+  les arrondis ne sont pas redistribuables avec des pourcentages entiers) ;
+- boutons **Tout cocher**, **Répartir 100 %** (par pas de 5 points) et **Réinitialiser** ;
+- chaque ligne a un **bouton >** qui donne au filtre les points de pourcentage encore libres
+  (100 − total), et le **nom du filtre est modifiable** directement dans la ligne ;
+- **+ filtre** / **- filtre** ajoutent ou retirent une ligne en fin de liste (temps de pose par
+  pas de **5 s** dans le plan) ;
+- **Copier le plan** met une ligne par filtre dans le presse-papiers
+  (`L : 48 × 120 s (01:36:00)`), suivie des totaux — désactivé tant que le plan est refusé.
+
+Les derniers réglages (langue, heures, temps de pose et plan par filtres) sont mémorisés dans
+`ExposureBudget.settings`, un petit fichier texte à côté du plugin, modifiable à la main
+(clés `overheadSeconds`, `flipReserveMinutes`, `fixedReserveMinutes`, `autofocusEvery`,
+`autofocusDurationSeconds` et le bloc `plan.filter.*` du plan par filtres).
 
 ## Langue
 
@@ -235,8 +288,8 @@ tools\
   build.ps1                       construction + vérifications (+ installation en option)
   install.ps1 / uninstall.ps1     installation et désinstallation dans N.I.N.A.
   makeicon\                       prépare l'image du plugin (redimensionnement, analyse, icône calculatrice)
-  verify\                         harnais de vérification de la logique de calcul (92 vérifications)
-  smoketest\                      harnais de chargement du plugin façon N.I.N.A. (157 vérifications)
+  verify\                         harnais de vérification de la logique de calcul (154 vérifications)
+  smoketest\                      harnais de chargement du plugin façon N.I.N.A. (228 vérifications)
 ```
 
 L'image de la fiche du plugin est `Resources\PluginImage.png` (256 × 256, carrée, intégrée à
@@ -259,7 +312,7 @@ mise à l'échelle d'écran ; utilisez `512` en dernier argument si vous voulez 
 (le fichier passe alors de ~120 à ~450 Ko). L'onglet du panneau, lui, conserve l'icône
 calculatrice **vectorielle** de N.I.N.A. (ressource `CalculatorSVG` de l'application).
 
-Le dossier de travail s'appelle encore `NTH - NumberToHours` : il peut être renommé librement,
+Le dossier de travail s'appelle `ExposureBudget` ; il peut être renommé ou déplacé librement,
 aucun fichier du projet ne contient de chemin absolu vers lui (les scripts calculent leurs
 chemins depuis leur propre emplacement).
 
@@ -267,20 +320,28 @@ chemins depuis leur propre emplacement).
 
 | Harnais | Ce qu'il valide | Commande |
 |---|---|---|
-| `tools\verify` | passage de minuit, durées, règle du 0,5, cas limites, bornes, refus des temps de pose invalides — sans WPF ni N.I.N.A. | `dotnet run --project tools\verify` |
-| `tools\smoketest` | composition MEF réelle (exports `IPluginManifest`, `ResourceDictionary`, `IDockableVM`), métadonnées, compatibilité, clé `…ExposureBudgetVM_Dockable` dans `Application.Resources`, chargement de la vue depuis le BAML, pose (layout) sans erreur, **libellés effectivement affichés**, absence de bouton de calcul, liaisons des ascenseurs, valeurs affichées, **recalcul en direct**, avertissements, bouton *Nuit astronomique* et ses replis, mémorisation et migration des réglages, **fiche du plugin traduite par les deux chemins (appel et liaison WPF)**, **icône du plugin chargée par le pack URI et affichée par la liaison**, **bascule en français** | `dotnet run --project tools\smoketest` |
+| `tools\verify` | passage de minuit, durées, règle du 0,5, cas limites, bornes, refus des temps de pose invalides, **surcharge par pose** (temps consommé, arrondi, dépassement), **temps à réserver** (flip, autofocus avec itération, réserves > fenêtre), **plan par filtres** (allocation, totaux, refus, temps consommé, répartition 100 %) — sans WPF ni N.I.N.A. | `dotnet run --project tools\verify` |
+| `tools\smoketest` | composition MEF réelle (exports `IPluginManifest`, `ResourceDictionary`, `IDockableVM`), métadonnées, compatibilité, clé `…ExposureBudgetVM_Dockable` dans `Application.Resources`, chargement de la vue depuis le BAML, pose (layout) sans erreur, **libellés effectivement affichés**, absence de bouton de calcul, liaisons des ascenseurs, valeurs affichées, **recalcul en direct**, avertissements, **trois onglets**, bouton *Nuit astronomique* (replis, hors des onglets, sous les informations, pleine largeur), **plan par filtres** (calcul, refus, reliquat, copie, renommage, ajout/suppression, lignes rendues sans chevauchement), **surcharge et réserves** (compteur, résumé, avertissement), mémorisation et migration des réglages, **fiche du plugin traduite et complète (cinq rubriques, deux langues)**, **icône du plugin chargée par le pack URI et affichée par la liaison** | `dotnet run --project tools\smoketest` |
 
 ## Versions et métadonnées
 
 | Version | Contenu |
 |---|---|
-| **1.2.1.0** | Version courante. Le bouton **Copy result** ne dépose plus que **le nombre de poses** dans le presse-papiers (et non tout le détail du calcul). |
+| **1.5.3.0** | Version courante. **Fiche du plugin réécrite** (Options → Plugins) : description courte et longue complètes, en anglais et en français, organisées en cinq rubriques — *fenêtre de séance*, *nombre de poses*, *nuit réaliste*, *caméra mono et filtres*, *réglages et langue* — pour qu'un utilisateur comprenne le panneau sans lire le README. Dix contrôles ajoutés sur le contenu de la fiche. |
+| 1.5.2.0 | **Bloc fenêtre réorganisé** : le bouton *Astronomical night* passe **sous** les informations de la fenêtre (pleine largeur, plus de chevauchement) et son message ne répète plus les horaires déjà affichés — il ne signale plus qu'un **repli** (pas de crépuscule astronomique cette nuit). Deux contrôles de placement ajoutés au harnais. |
+| 1.5.1.0 | Le bouton **Astronomical night** est déplacé dans le bloc **fenêtre d'acquisition** : il ne définit que le delta d'heures, il n'appartient à aucun onglet de calcul. Un contrôle automatique vérifie qu'il reste hors des onglets. |
+| 1.5.0.0 | **Réalisme du calcul** : **surcharge par pose** (téléchargement, dither, stabilisation — le temps consommé devient `exposition + surcharge`) et **temps à réserver** (retournement au méridien, autofocus périodiques, marge fixe) déduits de la fenêtre, avec itération sur les autofocus. Nouvel onglet « Temps à réserver » ; la surcharge s'applique aussi au plan par filtres. |
+| 1.4.0.0 | **Plan par filtres, lot 3** : bouton **>** qui attribue les pourcentages non utilisés au filtre de la ligne, **nom du filtre modifiable** dans la ligne, boutons **+ filtre** / **- filtre**, et **Copier le plan** (une ligne par filtre avec ses poses et le temps couvert, désactivé tant que le plan est refusé). |
+| 1.3.2.0 | **Plan par filtres, lignes lisibles** : les noms des filtres réapparaissent (le style implicite de N.I.N.A. est un interrupteur qui n'affiche pas son contenu) avec une **petite case à cocher de 20 px** propre au plugin, et **temps de pose réglé de 5 s en 5 s** dans le plan (l'onglet « Pose unique » garde 15 s). |
+| 1.3.1.0 | **Correctif d'affichage** de l'onglet « Plan par filtres » : la case à cocher de N.I.N.A. mesure 65 px (style `StandardCheckBox`) et le nom du filtre se superposait à elle — colonnes rééquilibrées et contrôle anti-chevauchement ajouté au harnais. |
+| 1.3.0.0 | **Plan par filtres** (caméra mono) : second onglet du panneau, une ligne par filtre (L, R, G, B, S, H, O) avec case à cocher, temps de pose et pourcentage du temps disponible ; nombre de poses par filtre, totaux, reliquat, et **refus** si les pourcentages dépassent 100 % ou si les poses arrondies dépassent la fenêtre. Boutons *Tout cocher*, *Répartir 100 %* et *Réinitialiser* ; plan mémorisé dans les réglages. |
+| 1.2.1.0 | Le bouton **Copy result** ne dépose plus que **le nombre de poses** dans le presse-papiers (et non tout le détail du calcul). |
 | 1.2.0.0 | **Confort** : bouton **Now** (heure de début = heure courante, date du jour) et bouton **Copy result** (copie du résultat, avec confirmation). |
 | 1.1.0.0 | **Renommage en « Exposure Budget »** (ex-« Number To Hours » : dossier de plugin `ExposureBudget`, réglages et heures conservés). **Fiche du plugin traduite** (description courte et longue) comme le panneau, et correction de son affichage (`public new Descriptions` : une implémentation d'interface explicite était invisible pour les liaisons WPF). **Image du plugin** dans la fiche. Détermination de la langue via **le profil actif de N.I.N.A.** avec retraduction à chaud. Migration des réglages (`settingsVersion`) et journalisation de la langue retenue. |
 | 1.0.0.0 | Première version fonctionnelle (nommée « Number To Hours ») : fenêtre d'acquisition `hh`/`mm`, temps de pose par pas de 15 s, équivalence en minutes, calcul en direct du nombre de poses avec la règle du 0,5, passage de minuit, heures identiques signalées, bouton *Nuit astronomique* (replis nautique/civil/Soleil), interface bilingue suivant N.I.N.A. (`en`/`fr` forçables), mémorisation des réglages. |
 
 Métadonnées affichées par N.I.N.A. dans **Options → Plugins** : nom `Exposure Budget`,
-auteur **Gerard Hurtaud**, version `1.2.1.0`, version minimale de N.I.N.A. `3.0.0.0`.
+auteur **Gerard Hurtaud**, version `1.5.3.0`, version minimale de N.I.N.A. `3.0.0.0`.
 
 La version se met à jour **à un seul endroit** : `AssemblyVersion` et `AssemblyFileVersion`
 dans `NINA.Plugin.ExposureBudget\Properties\AssemblyInfo.cs` (c'est la convention des plugins

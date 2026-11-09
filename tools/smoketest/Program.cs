@@ -69,7 +69,7 @@ namespace NINA.Plugin.ExposureBudget.SmokeTest {
             var manifest = imports.Manifest;
             CheckEqual("Nom du plugin", "Exposure Budget", manifest.Name);
             CheckEqual("Auteur", "Gerard Hurtaud", manifest.Author);
-            CheckEqual("Version", "1.2.1.0", manifest.Version.ToString());
+            CheckEqual("Version", "1.5.3.0", manifest.Version.ToString());
             Check("Version a quatre composants (exigence de N.I.N.A.)",
                 manifest.Version.ToString().Split('.').Length == 4
                 && manifest.Version.Build >= 0
@@ -85,12 +85,22 @@ namespace NINA.Plugin.ExposureBudget.SmokeTest {
             // La fiche du plugin (Options > Plugins) est lue par N.I.N.A. a travers
             // IPluginManifest : ces verifications passent donc bien par la reimplementation
             // du plugin et non par les attributs d'assembly.
-            CheckEqual("Fiche du plugin, description courte en anglais",
-                "Computes how many exposures of a given duration fit between a start time and an end time, taking the midnight rollover into account.",
+            Check("Fiche du plugin, description courte en anglais",
+                manifest.Descriptions.ShortDescription.Contains("filter plan", StringComparison.Ordinal)
+                && manifest.Descriptions.ShortDescription.Contains("how many exposures fit", StringComparison.Ordinal),
+                "les poses et le plan par filtres",
                 manifest.Descriptions.ShortDescription);
             Check("Fiche du plugin, description longue en anglais",
                 manifest.Descriptions.LongDescription.StartsWith("Exposure Budget works out", StringComparison.Ordinal),
                 "commence par \"Exposure Budget works out\"", manifest.Descriptions.LongDescription);
+
+            // La fiche doit couvrir toutes les fonctions : un utilisateur doit comprendre le
+            // panneau sans lire le README.
+            var fiche = manifest.Descriptions.LongDescription;
+            foreach (var rubrique in new[] { "SESSION WINDOW", "EXPOSURE COUNT", "A REALISTIC NIGHT", "MONO CAMERAS AND FILTERS", "SETTINGS AND LANGUAGE" }) {
+                Check($"Fiche anglaise : rubrique {rubrique}", fiche.Contains(rubrique, StringComparison.Ordinal), rubrique, fiche);
+            }
+
             Check("La fiche ne decrit plus un defaut anglais fige",
                 !manifest.Descriptions.LongDescription.Contains("English by default", StringComparison.Ordinal),
                 "aucune mention de \"English by default\"", manifest.Descriptions.LongDescription);
@@ -307,7 +317,7 @@ namespace NINA.Plugin.ExposureBudget.SmokeTest {
             CheckEqual("Minutes de fin issues de l'aube", 32, vm.EndMinute);
             CheckEqual("Debut affiche", "10/10/2026 19:42", vm.StartDateTimeText);
             CheckEqual("Fin affichee le lendemain", "11/10/2026 05:32", vm.EndDateTimeText);
-            CheckEqual("Information de nuit astronomique", "Astronomical night on 10/10/2026: 19:42 → 05:32 on 11/10/2026.", vm.NightInfoText);
+            Check("Nuit astronomique : aucun message redondant (les heures suffisent)", string.IsNullOrEmpty(vm.NightInfoText), "aucun message", vm.NightInfoText);
             Check("Aucun avertissement lorsque la nuit tombe juste (9 h 50 min a 300 s)", !vm.HasWarning, "aucun avertissement", vm.WarningText);
             CheckEqual("Nombre de poses pour 9 h 50 min a 300 s", "118", vm.PoseCountText);
 
@@ -337,7 +347,7 @@ namespace NINA.Plugin.ExposureBudget.SmokeTest {
             CheckEqual("Repli nautique : heure de debut", 20, vm.StartHour);
             CheckEqual("Repli nautique : minutes de debut", 15, vm.StartMinute);
             CheckEqual("Repli nautique : heure de fin", 4, vm.EndHour);
-            Check("Repli signale dans l'information", vm.NightInfoText.StartsWith("Nautical night", StringComparison.Ordinal), "*Nautical night*", vm.NightInfoText);
+            Check("Repli signale dans l'information", vm.NightInfoText.Contains("Nautical night", StringComparison.Ordinal), "*Nautical night*", vm.NightInfoText);
 
             Section("15. Memorisation des reglages");
             vm.StartHour = 22;
@@ -426,9 +436,19 @@ namespace NINA.Plugin.ExposureBudget.SmokeTest {
 
             Check("Fiche du plugin traduite en francais",
                 frenchImports != null
-                && frenchImports.Manifest.Descriptions.ShortDescription.StartsWith("Calcule combien de poses", StringComparison.Ordinal),
-                "commence par \"Calcule combien de poses\"",
+                && frenchImports.Manifest.Descriptions.ShortDescription.Contains("plan par filtres", StringComparison.Ordinal)
+                && frenchImports.Manifest.Descriptions.ShortDescription.Contains("poses", StringComparison.Ordinal),
+                "les poses et le plan par filtres",
                 frenchImports?.Manifest.Descriptions.ShortDescription);
+
+            // La fiche francaise doit couvrir toutes les fonctions du panneau.
+            if (frenchImports != null) {
+                foreach (var rubrique in new[] { "FENÊTRE DE SÉANCE", "NOMBRE DE POSES", "UNE NUIT RÉALISTE", "CAMÉRA MONO ET FILTRES", "RÉGLAGES ET LANGUE" }) {
+                    Check($"Fiche francaise : rubrique {rubrique}",
+                        frenchImports.Manifest.Descriptions.LongDescription.Contains(rubrique, StringComparison.Ordinal),
+                        rubrique, frenchImports.Manifest.Descriptions.LongDescription);
+                }
+            }
 
             // Reproduction de la liaison exacte de la page Options > Plugins de N.I.N.A. :
             // le DataContext du volet de detail est SelectedInstalledPlugin.Key, et le texte
@@ -450,15 +470,15 @@ namespace NINA.Plugin.ExposureBudget.SmokeTest {
                 sheetHost.UpdateLayout();
 
                 Check("Fiche du plugin, liaison WPF directe en francais",
-                    sheetProbe.Text.StartsWith("Calcule combien de poses", StringComparison.Ordinal),
-                    "commence par \"Calcule combien de poses\"", sheetProbe.Text);
+                    sheetProbe.Text.Contains("plan par filtres", StringComparison.Ordinal),
+                    "mentionne le plan par filtres", sheetProbe.Text);
                 Check("Liste des plugins (DataContext Key) en francais",
-                    sheetListProbe.Text.StartsWith("Calcule combien de poses", StringComparison.Ordinal),
-                    "commence par \"Calcule combien de poses\"", sheetListProbe.Text);
+                    sheetListProbe.Text.Contains("plan par filtres", StringComparison.Ordinal),
+                    "mentionne le plan par filtres", sheetListProbe.Text);
             }
             Check("Description longue en francais",
-                frenchImports != null && frenchImports.Manifest.Descriptions.LongDescription.StartsWith("Exposure Budget détermine", StringComparison.Ordinal),
-                "commence par \"Exposure Budget détermine\"",
+                frenchImports != null && frenchImports.Manifest.Descriptions.LongDescription.StartsWith("Exposure Budget calcule", StringComparison.Ordinal),
+                "commence par \"Exposure Budget calcule\"",
                 frenchImports?.Manifest.Descriptions.LongDescription);
             CheckEqual("Nom du plugin (stable : N.I.N.A. en derive le dossier d'installation)", "Exposure Budget", frenchImports?.Manifest.Name);
 
@@ -528,6 +548,303 @@ namespace NINA.Plugin.ExposureBudget.SmokeTest {
             CheckEqual("Bouton Maintenant en francais", "Maintenant", frenchImports?.Dockables.OfType<ExposureBudgetVM>().SingleOrDefault()?.Labels.NowButtonText);
             CheckEqual("Bouton Copier en francais", "Copier le résultat", frenchImports?.Dockables.OfType<ExposureBudgetVM>().SingleOrDefault()?.Labels.CopyButtonText);
 
+            Section("21. Plan par filtres : calcul et validations");
+
+            // Fenetre de 4 h (21:30 -> 01:30) : c'est l'exemple documente dans afaire.md.
+            vm.StartHour = 21;
+            vm.StartMinute = 30;
+            vm.EndHour = 1;
+            vm.EndMinute = 30;
+
+            CheckEqual("Sept filtres par defaut", 7, vm.FilterPlan.Count);
+            CheckEqual("Noms des filtres par defaut", "L,R,G,B,S,H,O", string.Join(",", vm.FilterPlan.Select(r => r.Name)));
+            CheckEqual("L a 40 % de 4 h avec 120 s -> 48 poses", "48", vm.FilterPlan[0].CountText);
+            CheckEqual("H a 7 % de 4 h avec 300 s -> 3 poses", "3", vm.FilterPlan[5].CountText);
+            Check("Totaux du plan affiches (100 % et 108 poses)",
+                vm.FilterPlanTotalsText.Contains("100", StringComparison.Ordinal)
+                && vm.FilterPlanTotalsText.Contains("108", StringComparison.Ordinal),
+                "100 % et 108 poses", vm.FilterPlanTotalsText);
+            Check("Plan par defaut sans erreur", !vm.HasFilterPlanError, "aucune erreur", vm.FilterPlanErrorText);
+            Check("Reliquat affiche (6 min perdues par les arrondis)",
+                vm.FilterPlanRemainingText.Contains("00:06:00", StringComparison.Ordinal),
+                "*00:06:00*", vm.FilterPlanRemainingText);
+
+            // Refus : les pourcentages depassent 100 %.
+            vm.FilterPlan[0].Percent = 100;
+            Check("Pourcentages > 100 % : plan refuse",
+                vm.HasFilterPlanError && vm.FilterPlanErrorText.Contains("100", StringComparison.Ordinal),
+                "un message de depassement", vm.FilterPlanErrorText);
+            vm.FilterPlan[0].Percent = 40;
+
+            // Refus : les poses arrondies depassent la fenetre. Ici 4 h / 9600 s = 1,5 -> 2 poses
+            // (regle du 0,5), soit 5 h 20 de poses pour une fenetre de 4 h.
+            foreach (var row in vm.FilterPlan.Skip(1).ToList()) { row.Enabled = false; }
+            vm.FilterPlan[0].Percent = 100;
+            vm.FilterPlan[0].ExposureSeconds = 9600d;
+            Check("Poses arrondies au-dela de la fenetre : plan refuse",
+                vm.HasFilterPlanError && vm.FilterPlanErrorText.Contains("exceed the window", StringComparison.Ordinal),
+                "un message de depassement de fenetre", vm.FilterPlanErrorText);
+
+            // Reinitialisation : retour aux valeurs par defaut, plus d'erreur.
+            vm.ResetFilterPlanCommand.Execute(null);
+            CheckEqual("Reinitialisation : 7 filtres", 7, vm.FilterPlan.Count);
+            CheckEqual("Reinitialisation : L a 40 %", 40, vm.FilterPlan[0].Percent);
+            Check("Reinitialisation : plus d'erreur", !vm.HasFilterPlanError, "aucune erreur", vm.FilterPlanErrorText);
+
+            // Repartition automatique : 100 % au total, par pas de 5.
+            vm.DistributeFiltersCommand.Execute(null);
+            CheckEqual("Repartition : total de 100 %", 100, vm.FilterPlan.Sum(r => r.Percent));
+            Check("Repartition : chaque part est un multiple de 5", vm.FilterPlan.All(r => r.Percent % 5 == 0),
+                "multiples de 5", string.Join(",", vm.FilterPlan.Select(r => r.Percent)));
+
+            // Tout cocher.
+            vm.FilterPlan[3].Enabled = false;
+            vm.CheckAllFiltersCommand.Execute(null);
+            Check("Tout cocher : tous les filtres actifs", vm.FilterPlan.All(r => r.Enabled), "tous coches", "au moins un decoche");
+
+            // Persistance du plan.
+            Check("Plan memorise dans les reglages",
+                File.ReadAllText(settingsPath).Contains("plan.filter.", StringComparison.Ordinal),
+                "une ligne plan.filter.", File.ReadAllText(settingsPath));
+
+            Section("22. Plan par filtres : onglet et tableau");
+            var tabControl = FindVisualChildren<TabControl>(host).FirstOrDefault();
+
+            // Le bouton « nuit astronomique » definit la fenetre (le delta d'heures) : il doit
+            // rester dans le bloc fenetre, hors des onglets de calcul.
+            var nightButton = FindVisualChildren<Button>(host)
+                .FirstOrDefault(b => b.Content is string text && text == vm.Labels.NightButtonText);
+            var insideTab = false;
+            for (var parent = nightButton == null ? null : VisualTreeHelper.GetParent(nightButton);
+                 parent != null;
+                 parent = VisualTreeHelper.GetParent(parent)) {
+                if (parent is TabControl) { insideTab = true; break; }
+            }
+            Check("Bouton nuit astronomique hors des onglets", nightButton != null && !insideTab,
+                "un bouton dans le bloc fenetre",
+                nightButton == null ? "<absent>" : (insideTab ? "dans un onglet" : "hors des onglets"));
+
+            // Le bouton doit etre SOUS les informations de la fenetre (et non par-dessus) et
+            // occuper la pleine largeur du bloc.
+            if (nightButton != null) {
+                var windowGroup = FindVisualChildren<GroupBox>(host).FirstOrDefault();
+                var sessionLine = FindVisualChildren<System.Windows.Controls.StackPanel>(host)
+                    .FirstOrDefault(p => p.ToolTip is string tip && tip == vm.Labels.SessionTooltip);
+
+                if (windowGroup != null && sessionLine != null) {
+                    var buttonBounds = nightButton.TransformToAncestor(windowGroup)
+                        .TransformBounds(new Rect(0, 0, nightButton.ActualWidth, nightButton.ActualHeight));
+                    var sessionBounds = sessionLine.TransformToAncestor(windowGroup)
+                        .TransformBounds(new Rect(0, 0, sessionLine.ActualWidth, sessionLine.ActualHeight));
+
+                    var overlap = Rect.Intersect(buttonBounds, sessionBounds);
+                    Check("Bouton nuit sous les informations de la fenetre (aucun chevauchement)",
+                        overlap.IsEmpty || overlap.Height <= 1,
+                        "deux zones distinctes",
+                        $"bouton y={buttonBounds.Y:0} h={buttonBounds.Height:0} | seance y={sessionBounds.Y:0} h={sessionBounds.Height:0}");
+
+                    Check("Bouton nuit en pleine largeur",
+                        buttonBounds.Width > 0 && Math.Abs(buttonBounds.Width - sessionBounds.Width) <= 12,
+                        "meme largeur que la ligne de seance",
+                        $"bouton {buttonBounds.Width:0} px / seance {sessionBounds.Width:0} px");
+                }
+            }
+            Check("Le panneau est organise en trois onglets", tabControl != null && tabControl.Items.Count == 3,
+                "3 onglets", tabControl == null ? "<aucun>" : tabControl.Items.Count.ToString());
+
+            if (tabControl != null) {
+                tabControl.SelectedIndex = 1;
+                host.UpdateLayout();
+
+                // On restreint la recherche au contenu de l'onglet (le premier onglet peut rester
+                // dans l'arbre visuel selon le cycle de disposition).
+                var planContent = (tabControl.Items[1] as TabItem)?.Content as FrameworkElement;
+                Check("Contenu de l'onglet plan disponible", planContent != null, "un contenu", planContent == null ? "<aucun>" : planContent.GetType().Name);
+
+                if (planContent != null) {
+                    CheckEqual("Onglet plan : sept lignes de temps de pose", 7, FindVisualChildren<PrecisionStepperControl>(planContent).Count());
+                    CheckEqual("Onglet plan : sept cases a cocher", 7, FindVisualChildren<CheckBox>(planContent).Count());
+                    CheckEqual("Onglet plan : sept ascenseurs de pourcentage", 7, FindVisualChildren<IntStepperControl>(planContent).Count());
+
+                    // Les noms des filtres doivent etre visibles (defaut constate : le style
+                    // implicite de N.I.N.A. est un interrupteur qui n'affiche pas son contenu).
+                    var planTexts = CollectTexts(planContent);
+                    Check("Onglet plan : les noms des filtres sont affiches",
+                        vm.FilterPlan.All(r => planTexts.Contains(r.Name)),
+                        "L, R, G, B, S, H, O", string.Join(" | ", planTexts.Take(20)));
+
+                    // Cases a cocher compactes : le style implicite de N.I.N.A. en fait 65 px de large.
+                    var planCheckBoxes = FindVisualChildren<CheckBox>(planContent).ToList();
+                    Check("Onglet plan : cases a cocher compactes",
+                        planCheckBoxes.Count == 7 && planCheckBoxes.All(c => c.ActualWidth > 0 && c.ActualWidth <= 26),
+                        "20 px de large",
+                        string.Join(",", planCheckBoxes.Select(c => c.ActualWidth.ToString("0"))));
+
+                    // Pas de 5 s pour les temps de pose du plan (l'onglet principal garde 15 s).
+                    CheckEqual("Plan : pas de 5 s sur le temps de pose", 5d, vm.FilterPlan[0].ExposureStepSeconds);
+                    var planPoseSteppers = FindVisualChildren<PrecisionStepperControl>(planContent).ToList();
+                    Check("Onglet plan : les ascenseurs de pose utilisent le pas de 5 s",
+                        planPoseSteppers.Count == 7 && planPoseSteppers.All(s => Math.Abs(s.StepSize - 5d) < 1e-9),
+                        "pas de 5 s", string.Join(",", planPoseSteppers.Select(s => s.StepSize.ToString("0"))));
+
+                    var planItems = FindVisualChildren<ItemsControl>(planContent).FirstOrDefault();
+                    Check("Onglet plan : tableau des sept filtres", planItems != null && planItems.Items.Count == 7,
+                        "7 lignes", planItems == null ? "<aucun tableau>" : planItems.Items.Count.ToString());
+
+                    // Les elements d'une ligne ne doivent pas se chevaucher : la case a cocher de
+                    // N.I.N.A. fait 65 px de large (style StandardCheckBox) et contient le nom du
+                    // filtre — c'est ce defaut qui faisait superposer la case et le nom.
+                    var rowGrid = FindVisualChildren<Grid>(planContent).FirstOrDefault(g => g.Children.OfType<CheckBox>().Any());
+                    Check("Onglet plan : une ligne de filtre est construite", rowGrid != null, "une ligne", rowGrid == null ? "<aucune>" : "trouvee");
+
+                    if (rowGrid != null) {
+                        var bounds = new List<(string Name, Rect Bounds)>();
+                        foreach (UIElement child in rowGrid.Children) {
+                            try {
+                                var transform = child.TransformToAncestor(rowGrid);
+                                var rect = transform.TransformBounds(new Rect(0, 0, child.RenderSize.Width, child.RenderSize.Height));
+                                bounds.Add((child.GetType().Name, rect));
+                            } catch {
+                                // element non encore realise : ignore
+                            }
+                        }
+
+                        var overlapping = new List<string>();
+                        for (var i = 0; i < bounds.Count; i++) {
+                            for (var j = i + 1; j < bounds.Count; j++) {
+                                var intersection = Rect.Intersect(bounds[i].Bounds, bounds[j].Bounds);
+                                if (!intersection.IsEmpty && intersection.Width > 1 && intersection.Height > 1) {
+                                    overlapping.Add($"{bounds[i].Name}/{bounds[j].Name}");
+                                }
+                            }
+                        }
+
+                        Check("Onglet plan : aucun chevauchement dans une ligne de filtre",
+                            bounds.Count >= 4 && overlapping.Count == 0,
+                            "4 elements mesures et aucun chevauchement",
+                            string.Join(" | ", bounds.Select(x => $"{x.Name} x={x.Bounds.X:0} w={x.Bounds.Width:0}")));
+                    }
+                }
+            }
+
+            Section("23. Plan par filtres : reliquat, copie et gestion de la liste");
+
+            // Etat connu : les sept filtres par defaut (100 %), puis 3 points laisses libres.
+            vm.ResetFilterPlanCommand.Execute(null);
+            vm.FilterPlan[6].Percent = 0;
+            CheckEqual("Pourcentages non utilises", 3, 100 - vm.FilterPlan.Sum(r => r.Percent));
+            Check("Le bouton de reliquat est actif sur les filtres eligibles",
+                vm.FilterPlan[0].CanReceiveRemainder, "actif", "inactif");
+
+            vm.FilterPlan[0].ReceiveRemainderCommand.Execute(null);
+            CheckEqual("Reliquat attribue : total de 100 %", 100, vm.FilterPlan.Sum(r => r.Percent));
+            Check("Plus de reliquat a attribuer", !vm.FilterPlan[0].CanReceiveRemainder, "inactif", "actif");
+
+            // Copie du plan : une ligne par filtre actif, puis les totaux.
+            var planText = vm.FilterPlanClipboardText;
+            Check("Plan copie : une ligne par filtre actif",
+                planText.Split(new[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries).Length >= 7,
+                "7 lignes ou plus", planText);
+            Check("Plan copie : filtre, poses et duree",
+                planText.Contains(" : ", StringComparison.Ordinal) && planText.Contains("×", StringComparison.Ordinal),
+                "*L : N × T s (duree)*", planText);
+            Check("Plan valide : copie autorisee", vm.CanCopyFilterPlan, "autorisee", "refusee");
+
+            vm.CopyFilterPlanCommand.Execute(null);
+            Check("Bouton Copier le plan : retour affiche", vm.HasFilterPlanStatus, "un message", vm.FilterPlanStatusText);
+
+            // Renommage d'un filtre qui participe au plan (le nom apparait alors dans la copie).
+            vm.FilterPlan[3].Name = "Ha";
+            CheckEqual("Renommage d'un filtre", "Ha", vm.FilterPlan[3].Name);
+            Check("Le nom renomme apparait dans le plan copie",
+                vm.FilterPlanClipboardText.Contains("Ha", StringComparison.Ordinal), "*Ha*", vm.FilterPlanClipboardText);
+
+            // Ajout et suppression d'une ligne.
+            var initialRows = vm.FilterPlan.Count;
+            vm.AddFilterCommand.Execute(null);
+            CheckEqual("Ajout d'un filtre", initialRows + 1, vm.FilterPlan.Count);
+            CheckEqual("Le filtre ajoute part a 0 %", 0, vm.FilterPlan[initialRows].Percent);
+
+            vm.RemoveLastFilterCommand.Execute(null);
+            CheckEqual("Suppression du dernier filtre", initialRows, vm.FilterPlan.Count);
+
+            // Un plan refuse n'est pas proposé à la copie.
+            vm.FilterPlan[0].Percent = 100;
+            Check("Plan refuse : copie desactivee", !vm.CanCopyFilterPlan, "refusee", "autorisee");
+            vm.ResetFilterPlanCommand.Execute(null);
+
+            Section("24. Surcharge par pose et temps a reserver");
+
+            // Etat connu : 21:30 -> 03:15 (5 h 45), pose de 300 s, sans surcharge ni reserve.
+            vm.StartHour = 21;
+            vm.StartMinute = 30;
+            vm.EndHour = 3;
+            vm.EndMinute = 15;
+            vm.ExposureSeconds = 300d;
+            vm.ExposureOverheadSeconds = 0d;
+            vm.FlipReserveMinutes = 0d;
+            vm.FixedReserveMinutes = 0d;
+            vm.AutofocusEvery = 0;
+            vm.AutofocusDurationSeconds = 0d;
+
+            CheckEqual("Sans surcharge : 69 poses", "69", vm.PoseCountText);
+            Check("Aucune surcharge : pas d'indication", !vm.HasOverhead, "aucune", vm.OverheadInfoText);
+
+            vm.ExposureOverheadSeconds = 5d;
+            CheckEqual("Surcharge de 5 s : 68 poses", "68", vm.PoseCountText);
+            Check("Surcharge : indication du cout par pose", vm.HasOverhead && !string.IsNullOrEmpty(vm.OverheadInfoText),
+                "une indication", vm.OverheadInfoText);
+            Check("Surcharge : le detail du calcul la mentionne",
+                vm.ResultDetailText.Contains("overhead", StringComparison.Ordinal)
+                || vm.ResultDetailText.Contains("surcharge", StringComparison.Ordinal),
+                "*overhead*", vm.ResultDetailText);
+            Check("Surcharge : rappel dans le plan", vm.HasPlanOverhead && !string.IsNullOrEmpty(vm.PlanOverheadHintText),
+                "un rappel", vm.PlanOverheadHintText);
+
+            // Le plan par filtres tient compte de la meme surcharge.
+            var planWithOverhead = vm.FilterPlanClipboardText;
+            vm.ExposureOverheadSeconds = 0d;
+            var planWithoutOverhead = vm.FilterPlanClipboardText;
+            Check("Plan : la surcharge change le nombre de poses", planWithOverhead != planWithoutOverhead,
+                "un plan different", planWithoutOverhead);
+
+            // Reserves : retournement de 10 min et marge de 5 min.
+            vm.FlipReserveMinutes = 10d;
+            vm.FixedReserveMinutes = 5d;
+            Check("Reserves : signalees", vm.HasReserves, "des reserves", "aucune");
+            CheckEqual("Reserves de 15 min : 66 poses", "66", vm.PoseCountText);
+            Check("Reserves : resume affiche", !string.IsNullOrEmpty(vm.ReservesSummaryText), "un resume", vm.ReservesSummaryText);
+
+            // Autofocus toutes les 10 poses : le nombre passe a 65 apres iteration.
+            vm.AutofocusEvery = 10;
+            vm.AutofocusDurationSeconds = 60d;
+            CheckEqual("Autofocus : 65 poses", "65", vm.PoseCountText);
+
+            // Reserves au-dela de la fenetre : avertissement.
+            vm.FlipReserveMinutes = 400d;
+            Check("Reserves > fenetre : avertissement", vm.HasWarning, "un avertissement", vm.WarningText);
+            CheckEqual("Reserves > fenetre : 0 pose", "0", vm.PoseCountText);
+
+            // Retour a l'etat sans reserve.
+            vm.FlipReserveMinutes = 0d;
+            vm.FixedReserveMinutes = 0d;
+            vm.AutofocusEvery = 0;
+            vm.AutofocusDurationSeconds = 0d;
+            CheckEqual("Sans reserve : 69 poses", "69", vm.PoseCountText);
+
+            // Onglet des reserves : les quatre reglages sont rendus.
+            var reservesTab = tabControl != null && tabControl.Items.Count > 2 ? tabControl.Items[2] as TabItem : null;
+            var reservesContent = reservesTab?.Content as FrameworkElement;
+            Check("Onglet des reserves present", reservesContent != null, "un contenu", reservesContent == null ? "<aucun>" : reservesContent.GetType().Name);
+
+            if (reservesContent != null) {
+                tabControl.SelectedIndex = 2;
+                host.UpdateLayout();
+                var reserveSteppers = FindVisualChildren<PrecisionStepperControl>(reservesContent).Count()
+                                    + FindVisualChildren<IntStepperControl>(reservesContent).Count();
+                CheckEqual("Onglet des reserves : quatre reglages", 4, reserveSteppers);
+            }
+
             if (settingsBackup != null) { File.WriteAllText(settingsPath, settingsBackup); } else { File.Delete(settingsPath); }
 
             return Report();
@@ -580,6 +897,11 @@ namespace NINA.Plugin.ExposureBudget.SmokeTest {
 
             foreach (var textBlock in FindVisualChildren<TextBlock>(root)) {
                 if (!string.IsNullOrWhiteSpace(textBlock.Text)) { texts.Add(textBlock.Text); }
+            }
+
+            // Les champs de saisie portent aussi du texte visible (nom du filtre, valeurs).
+            foreach (var textBox in FindVisualChildren<TextBox>(root)) {
+                if (!string.IsNullOrWhiteSpace(textBox.Text)) { texts.Add(textBox.Text); }
             }
 
             foreach (var button in FindVisualChildren<Button>(root)) {
