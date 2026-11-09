@@ -26,8 +26,8 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyCopyright("Copyright © 2026 Gerard Hurtaud")]
 [assembly: ComVisible(false)]
 [assembly: Guid("8F3A1C64-2D7E-4B91-A3F5-6C0D9E7B4A28")]
-[assembly: AssemblyVersion("1.5.3.0")]
-[assembly: AssemblyFileVersion("1.5.3.0")]
+[assembly: AssemblyVersion("1.5.4.0")]
+[assembly: AssemblyFileVersion("1.5.4.0")]
 
 [assembly: AssemblyMetadata("MinimumApplicationVersion", "3.0.0.0")]
 [assembly: AssemblyMetadata("License", "MPL-2.0")]

@@ -36,7 +36,7 @@ namespace NINA.Plugin.ExposureBudget.Localization {
 
         public string NowButtonText => "Now";
 
-        public string NowButtonTooltip => "Fills the start time with the current time";
+        public string NowButtonTooltip => "Fills the start time with the current time (the reference date becomes today, so a click in the morning does not move the session to the previous evening)";
 
         public string ExposureGroupHeader => "Exposure time";
 
@@ -54,7 +54,7 @@ namespace NINA.Plugin.ExposureBudget.Localization {
 
         public string CopyButtonText => "Copy result";
 
-        public string CopyButtonTooltip => "Copies the number of exposures to the clipboard";
+        public string CopyButtonTooltip => "Copies only the number of exposures (the value shown in large) to the clipboard";
 
         public string CopyFeedback => "Number of exposures copied to the clipboard.";
 
@@ -76,9 +76,15 @@ namespace NINA.Plugin.ExposureBudget.Localization {
 
         public string FilterCheckAllButton => "Check all";
 
+        public string FilterCheckAllTooltip => "Checks every filter of the plan; exposure times and percentages are kept";
+
         public string FilterDistributeButton => "Split 100 %";
 
+        public string FilterDistributeTooltip => "Splits 100 % evenly between the checked filters, in steps of 5 points (the remainder goes to the first ones)";
+
         public string FilterResetButton => "Reset";
+
+        public string FilterResetTooltip => "Restores the default filters (L, R, G, B, S, H, O at 40/15/15/15/5/7/3 %)";
 
         public string FilterTotalsFormat => "{0} % · {1} {2} · {3}";
 
@@ -96,7 +102,7 @@ namespace NINA.Plugin.ExposureBudget.Localization {
 
         public string FilterRemainderButton => ">";
 
-        public string FilterRemainderTooltip => "Give the unused percentages to this filter";
+        public string FilterRemainderTooltip => "Gives the unused percentage points (100 minus the total) to this filter; only enabled when some are left";
 
         public string FilterAddButton => "+ filter";
 
@@ -112,7 +118,7 @@ namespace NINA.Plugin.ExposureBudget.Localization {
 
         public string FilterPlanCopyButton => "Copy plan";
 
-        public string FilterPlanCopyTooltip => "Copies one line per filter, with its exposures and covered time";
+        public string FilterPlanCopyTooltip => "Copies one line per active filter (exposures and covered time), then the totals; disabled while the plan is refused";
 
         public string FilterPlanCopyFeedback => "Filter plan copied to the clipboard.";
 

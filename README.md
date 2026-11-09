@@ -289,7 +289,7 @@ tools\
   install.ps1 / uninstall.ps1     installation et désinstallation dans N.I.N.A.
   makeicon\                       prépare l'image du plugin (redimensionnement, analyse, icône calculatrice)
   verify\                         harnais de vérification de la logique de calcul (154 vérifications)
-  smoketest\                      harnais de chargement du plugin façon N.I.N.A. (228 vérifications)
+  smoketest\                      harnais de chargement du plugin façon N.I.N.A. (238 vérifications)
 ```
 
 L'image de la fiche du plugin est `Resources\PluginImage.png` (256 × 256, carrée, intégrée à
@@ -327,7 +327,8 @@ chemins depuis leur propre emplacement).
 
 | Version | Contenu |
 |---|---|
-| **1.5.3.0** | Version courante. **Fiche du plugin réécrite** (Options → Plugins) : description courte et longue complètes, en anglais et en français, organisées en cinq rubriques — *fenêtre de séance*, *nombre de poses*, *nuit réaliste*, *caméra mono et filtres*, *réglages et langue* — pour qu'un utilisateur comprenne le panneau sans lire le README. Dix contrôles ajoutés sur le contenu de la fiche. |
+| **1.5.4.0** | Version courante. **Info-bulles sur toutes les commandes** : *Tout cocher*, *Répartir 100 %* et *Réinitialiser* en avaient (elles expliquent maintenant l'effet et ce qui est conservé), et les info-bulles existantes (*Now*, *Copier*, *Copier le plan*, bouton de reliquat, surcharge, filtres) ont été précisées. Dix contrôles automatiques vérifient que chaque bouton du panneau porte une info-bulle. |
+| 1.5.3.0 | **Fiche du plugin réécrite** (Options → Plugins) : description courte et longue complètes, en anglais et en français, organisées en cinq rubriques — *fenêtre de séance*, *nombre de poses*, *nuit réaliste*, *caméra mono et filtres*, *réglages et langue* — pour qu'un utilisateur comprenne le panneau sans lire le README. Dix contrôles ajoutés sur le contenu de la fiche. |
 | 1.5.2.0 | **Bloc fenêtre réorganisé** : le bouton *Astronomical night* passe **sous** les informations de la fenêtre (pleine largeur, plus de chevauchement) et son message ne répète plus les horaires déjà affichés — il ne signale plus qu'un **repli** (pas de crépuscule astronomique cette nuit). Deux contrôles de placement ajoutés au harnais. |
 | 1.5.1.0 | Le bouton **Astronomical night** est déplacé dans le bloc **fenêtre d'acquisition** : il ne définit que le delta d'heures, il n'appartient à aucun onglet de calcul. Un contrôle automatique vérifie qu'il reste hors des onglets. |
 | 1.5.0.0 | **Réalisme du calcul** : **surcharge par pose** (téléchargement, dither, stabilisation — le temps consommé devient `exposition + surcharge`) et **temps à réserver** (retournement au méridien, autofocus périodiques, marge fixe) déduits de la fenêtre, avec itération sur les autofocus. Nouvel onglet « Temps à réserver » ; la surcharge s'applique aussi au plan par filtres. |
@@ -341,7 +342,7 @@ chemins depuis leur propre emplacement).
 | 1.0.0.0 | Première version fonctionnelle (nommée « Number To Hours ») : fenêtre d'acquisition `hh`/`mm`, temps de pose par pas de 15 s, équivalence en minutes, calcul en direct du nombre de poses avec la règle du 0,5, passage de minuit, heures identiques signalées, bouton *Nuit astronomique* (replis nautique/civil/Soleil), interface bilingue suivant N.I.N.A. (`en`/`fr` forçables), mémorisation des réglages. |
 
 Métadonnées affichées par N.I.N.A. dans **Options → Plugins** : nom `Exposure Budget`,
-auteur **Gerard Hurtaud**, version `1.5.3.0`, version minimale de N.I.N.A. `3.0.0.0`.
+auteur **Gerard Hurtaud**, version `1.5.4.0`, version minimale de N.I.N.A. `3.0.0.0`.
 
 La version se met à jour **à un seul endroit** : `AssemblyVersion` et `AssemblyFileVersion`
 dans `NINA.Plugin.ExposureBudget\Properties\AssemblyInfo.cs` (c'est la convention des plugins

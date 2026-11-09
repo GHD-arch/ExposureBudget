@@ -416,19 +416,22 @@
                                 Height="24"
                                 Padding="6,0"
                                 Command="{Binding CheckAllFiltersCommand}"
-                                Content="{Binding Labels.FilterCheckAllButton}" />
+                                Content="{Binding Labels.FilterCheckAllButton}"
+                                ToolTip="{Binding Labels.FilterCheckAllTooltip}" />
                             <Button
                                 Height="24"
                                 Margin="6,0,0,0"
                                 Padding="6,0"
                                 Command="{Binding DistributeFiltersCommand}"
-                                Content="{Binding Labels.FilterDistributeButton}" />
+                                Content="{Binding Labels.FilterDistributeButton}"
+                                ToolTip="{Binding Labels.FilterDistributeTooltip}" />
                             <Button
                                 Height="24"
                                 Margin="6,4,0,0"
                                 Padding="6,0"
                                 Command="{Binding ResetFilterPlanCommand}"
-                                Content="{Binding Labels.FilterResetButton}" />
+                                Content="{Binding Labels.FilterResetButton}"
+                                ToolTip="{Binding Labels.FilterResetTooltip}" />
                             <Button
                                 Height="24"
                                 Margin="6,4,0,0"

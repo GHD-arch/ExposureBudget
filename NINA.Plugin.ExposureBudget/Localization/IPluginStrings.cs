@@ -88,6 +88,15 @@ namespace NINA.Plugin.ExposureBudget.Localization {
         /// <summary>Bouton qui coche tous les filtres.</summary>
         string FilterCheckAllButton { get; }
 
+        /// <summary>Info-bulle du bouton « tout cocher ».</summary>
+        string FilterCheckAllTooltip { get; }
+
+        /// <summary>Info-bulle du bouton « repartir 100 % ».</summary>
+        string FilterDistributeTooltip { get; }
+
+        /// <summary>Info-bulle du bouton « reinitialiser ».</summary>
+        string FilterResetTooltip { get; }
+
         /// <summary>Bouton qui repartit 100 % entre les filtres coches.</summary>
         string FilterDistributeButton { get; }
 

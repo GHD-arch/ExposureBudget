@@ -4,7 +4,7 @@ Récapitulatif complet de ce qui a été conçu, développé, vérifié et docum
 N.I.N.A. Document destiné à être lu seul : il reprend les décisions, les pièges rencontrés et
 les résultats des vérifications, sans avoir à parcourir l'historique du projet.
 
-- **Plugin** : Exposure Budget (ex-« Number To Hours »), version **1.5.3.0**
+- **Plugin** : Exposure Budget (ex-« Number To Hours »), version **1.5.4.0**
 - **Auteur** : Gerard Hurtaud
 - **Application cible** : N.I.N.A. 3.2.0.9001 installée (`net8.0-windows`), version minimale déclarée `3.0.0.0`
 - **Dossier de travail** : `E:\DEV\ExposureBudget`
@@ -104,7 +104,7 @@ tools\
   install.ps1 / uninstall.ps1        installation / désinstallation (avec migration)
   makeicon\                          préparation et analyse d'images pour la fiche du plugin
   verify\                            harnais de calcul (154 vérifications)
-  smoketest\                         harnais de chargement façon N.I.N.A. (228 vérifications)
+  smoketest\                         harnais de chargement façon N.I.N.A. (238 vérifications)
 ExposureBudget.sln, README.md, digest.md, afaire.md
 ```
 
@@ -219,7 +219,7 @@ conservées.
 | Harnais | Portée | Résultat |
 |---|---|---|
 | `tools\verify` | logique de calcul pure : passage de minuit, durées, règle du 0,5, cas limites, bornes, refus des temps de pose invalides | **154 vérifications** |
-| `tools\smoketest` | chargement façon N.I.N.A. : composition **MEF réelle**, métadonnées et compatibilité, clé du `DataTemplate` dans `Application.Resources`, chargement de la vue depuis le BAML, **pose (layout) sans erreur**, **libellés effectivement affichés** dans le bon langage, liaisons des ascenseurs, recalcul en direct, bouton « Maintenant », contenu du texte copié et sa confirmation, avertissements, bouton *Nuit astronomique* et ses replis, réglages et migration, **fiche du plugin traduite par les deux chemins (appel C# et liaison WPF)**, **image chargée par le pack URI et affichée par la liaison** | **228 vérifications** |
+| `tools\smoketest` | chargement façon N.I.N.A. : composition **MEF réelle**, métadonnées et compatibilité, clé du `DataTemplate` dans `Application.Resources`, chargement de la vue depuis le BAML, **pose (layout) sans erreur**, **libellés effectivement affichés** dans le bon langage, liaisons des ascenseurs, recalcul en direct, bouton « Maintenant », contenu du texte copié et sa confirmation, avertissements, bouton *Nuit astronomique* et ses replis, réglages et migration, **fiche du plugin traduite par les deux chemins (appel C# et liaison WPF)**, **image chargée par le pack URI et affichée par la liaison** | **238 vérifications** |
 
 Ces harnais ont réellement trouvé des défauts pendant le développement : un écart de
 l'arrondi affiché au-delà de la fenêtre, la migration des réglages manquante, la fiche du
@@ -251,7 +251,7 @@ Le panneau apparaît dans le volet des outils de l'onglet **Imagerie**.
 |---|---|
 | Nom affiché | `Exposure Budget` |
 | Auteur | `Gerard Hurtaud` |
-| Version | **`1.5.3.0`** (quatre composants obligatoires) |
+| Version | **`1.5.4.0`** (quatre composants obligatoires) |
 | Version minimale de N.I.N.A. | `3.0.0.0` |
 | Identifiant (GUID) | `8F3A1C64-2D7E-4B91-A3F5-6C0D9E7B4A28` |
 | Licence | MPL-2.0 |
@@ -269,7 +269,7 @@ La version se met à jour à un seul endroit : `Properties\AssemblyInfo.cs`.
 Au démarrage, le plugin écrit deux lignes dans `%LOCALAPPDATA%\NINA\Logs\*.log` :
 
 ```
-ExposureBudget: panel language 'fr' (setting 'auto', N.I.N.A. language 'fr-FR'), plugin 1.5.3.0 loaded from ...
+ExposureBudget: panel language 'fr' (setting 'auto', N.I.N.A. language 'fr-FR'), plugin 1.5.4.0 loaded from ...
 ExposureBudget: plugin sheet language 'fr' (N.I.N.A. language 'fr-FR')
 ```
 
@@ -313,6 +313,6 @@ Déjà livrés depuis la première rédaction de cette liste : la **surcharge pa
 | `tools\build.ps1` | construction, vérification, installation |
 | `tools\install.ps1` / `uninstall.ps1` | installation / désinstallation, avec migration depuis l'ancien nom |
 | `tools\verify\Program.cs` | harnais de calcul (154 vérifications) |
-| `tools\smoketest\Program.cs` + `Stubs.cs` | harnais de chargement (228 vérifications) |
+| `tools\smoketest\Program.cs` + `Stubs.cs` | harnais de chargement (238 vérifications) |
 | `tools\makeicon\Program.cs` | préparation / analyse d'images, génération de l'icône calculatrice |
 | `image.png` | image source fournie par l'auteur (1024 × 1024) ; le plugin embarque la version préparée |

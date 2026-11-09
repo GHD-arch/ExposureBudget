@@ -69,7 +69,7 @@ namespace NINA.Plugin.ExposureBudget.SmokeTest {
             var manifest = imports.Manifest;
             CheckEqual("Nom du plugin", "Exposure Budget", manifest.Name);
             CheckEqual("Auteur", "Gerard Hurtaud", manifest.Author);
-            CheckEqual("Version", "1.5.3.0", manifest.Version.ToString());
+            CheckEqual("Version", "1.5.4.0", manifest.Version.ToString());
             Check("Version a quatre composants (exigence de N.I.N.A.)",
                 manifest.Version.ToString().Split('.').Length == 4
                 && manifest.Version.Build >= 0
@@ -610,6 +610,22 @@ namespace NINA.Plugin.ExposureBudget.SmokeTest {
             Section("22. Plan par filtres : onglet et tableau");
             var tabControl = FindVisualChildren<TabControl>(host).FirstOrDefault();
 
+            // Chaque bouton du panneau doit expliquer ce qu'il fait.
+            void CheckTooltip(string label, string description) {
+                var buttons = FindVisualChildren<Button>(host)
+                    .Where(b => b.Content is string text && text == label)
+                    .ToList();
+
+                Check($"Info-bulle : {description}",
+                    buttons.Count > 0 && buttons.All(b => b.ToolTip is string tip && tip.Trim().Length > 0),
+                    "un bouton avec une info-bulle",
+                    buttons.Count == 0 ? "<bouton absent>" : string.Join(" | ", buttons.Select(b => b.ToolTip as string ?? "<vide>")));
+            }
+
+            CheckTooltip(vm.Labels.NowButtonText, "bouton Now");
+            CheckTooltip(vm.Labels.NightButtonText, "bouton Nuit astronomique");
+            CheckTooltip(vm.Labels.CopyButtonText, "bouton Copier le resultat");
+
             // Le bouton « nuit astronomique » definit la fenetre (le delta d'heures) : il doit
             // rester dans le bloc fenetre, hors des onglets de calcul.
             var nightButton = FindVisualChildren<Button>(host)
@@ -655,6 +671,14 @@ namespace NINA.Plugin.ExposureBudget.SmokeTest {
             if (tabControl != null) {
                 tabControl.SelectedIndex = 1;
                 host.UpdateLayout();
+
+                CheckTooltip(vm.Labels.FilterCheckAllButton, "bouton Tout cocher");
+                CheckTooltip(vm.Labels.FilterDistributeButton, "bouton Repartir 100 %");
+                CheckTooltip(vm.Labels.FilterResetButton, "bouton Reinitialiser");
+                CheckTooltip(vm.Labels.FilterAddButton, "bouton + filtre");
+                CheckTooltip(vm.Labels.FilterRemoveButton, "bouton - filtre");
+                CheckTooltip(vm.Labels.FilterPlanCopyButton, "bouton Copier le plan");
+                CheckTooltip(vm.Labels.FilterRemainderButton, "boutons de reliquat (une par filtre)");
 
                 // On restreint la recherche au contenu de l'onglet (le premier onglet peut rester
                 // dans l'arbre visuel selon le cycle de disposition).

@@ -36,7 +36,7 @@ namespace NINA.Plugin.ExposureBudget.Localization {
 
         public string NowButtonText => "Maintenant";
 
-        public string NowButtonTooltip => "Remplit l'heure de début avec l'heure courante";
+        public string NowButtonTooltip => "Remplit l'heure de début avec l'heure courante (la date de référence passe au jour courant : un clic le matin ne place pas la séance la veille)";
 
         public string ExposureGroupHeader => "Temps de pose";
 
@@ -54,7 +54,7 @@ namespace NINA.Plugin.ExposureBudget.Localization {
 
         public string CopyButtonText => "Copier le résultat";
 
-        public string CopyButtonTooltip => "Copie le nombre de poses dans le presse-papiers";
+        public string CopyButtonTooltip => "Copie uniquement le nombre de poses (la valeur affichée en grand) dans le presse-papiers";
 
         public string CopyFeedback => "Nombre de poses copié dans le presse-papiers.";
 
@@ -76,9 +76,15 @@ namespace NINA.Plugin.ExposureBudget.Localization {
 
         public string FilterCheckAllButton => "Tout cocher";
 
+        public string FilterCheckAllTooltip => "Coche tous les filtres du plan ; les temps de pose et les pourcentages sont conservés";
+
         public string FilterDistributeButton => "Répartir 100 %";
 
+        public string FilterDistributeTooltip => "Répartit 100 % entre les filtres cochés, par pas de 5 points (le reliquat va aux premiers)";
+
         public string FilterResetButton => "Réinitialiser";
+
+        public string FilterResetTooltip => "Rétablit les filtres par défaut (L, R, G, B, S, H, O à 40/15/15/15/5/7/3 %)";
 
         public string FilterTotalsFormat => "{0} % · {1} {2} · {3}";
 
@@ -96,7 +102,7 @@ namespace NINA.Plugin.ExposureBudget.Localization {
 
         public string FilterRemainderButton => ">";
 
-        public string FilterRemainderTooltip => "Attribuer les pourcentages non utilisés à ce filtre";
+        public string FilterRemainderTooltip => "Attribue les points de pourcentage non utilisés (100 moins le total) à ce filtre ; actif seulement s'il en reste";
 
         public string FilterAddButton => "+ filtre";
 
@@ -112,7 +118,7 @@ namespace NINA.Plugin.ExposureBudget.Localization {
 
         public string FilterPlanCopyButton => "Copier le plan";
 
-        public string FilterPlanCopyTooltip => "Copie une ligne par filtre, avec ses poses et le temps couvert";
+        public string FilterPlanCopyTooltip => "Copie une ligne par filtre actif (poses et temps couvert), puis les totaux ; désactivé tant que le plan est refusé";
 
         public string FilterPlanCopyFeedback => "Plan par filtres copié dans le presse-papiers.";
 
