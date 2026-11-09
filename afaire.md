@@ -346,8 +346,9 @@ du texte copié, confirmation affichée puis effacée au calcul suivant, libell�
 
 ## 11. Plan par filtres (caméra mono)
 
-> **État : fait (version 1.4.0.0).** Les trois lots sont réalisés. Reste à intégrer la surcharge
-> et les réserves dans le plan quand les tâches 2 et 3 seront faites.
+> **État : fait.** Les trois lots sont réalisés (1.4.0.0) et le plan profite désormais de la
+> surcharge par pose et des temps à réserver (1.5.0.0) : le temps consommé d'une pose du plan
+> inclut la surcharge, et la fenêtre utilisée est la fenêtre exploitable.
 > Origine : caméra mono, filtres L/R/G/B/S/H/O, un temps de pose et un pourcentage du temps
 > disponible par filtre, avec vérification que le total tient dans la nuit.
 
@@ -363,7 +364,7 @@ filtre en vérifiant que le total ne dépasse pas la fenêtre.
 | 2 | Σ % < 100 | **bouton « Attribuer le reliquat »** : les points de pourcentage non utilisés vont au filtre sélectionné |
 | 3 | Dépassement dû aux arrondis | **refus** : aucun arbitrage automatique, le plan est déclaré invalide avec le dépassement chiffré |
 | 4 | Arrondi par filtre | **règle du 0,5**, identique au calcul simple |
-| 5 | Structure de l'interface | **deux onglets** : « Pose unique » (existant) et « Plan par filtres » |
+| 5 | Structure de l'interface | **deux onglets** : « Pose unique » (existant) et « Plan par filtres » (un troisième onglet, « Temps à réserver », est venu ensuite avec la tâche 3) |
 | 6 | Liste des filtres | **liste fixe éditable** (pas de roue à filtres aujourd'hui) : noms modifiables, ajout et suppression de lignes |
 
 ### 11.2 Calcul, pour chaque filtre coché
